@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "pvm": "2026-02-15",
+    "kilpailu": "Kansallinen kisa",
+    "ampuja": "Ville Hautala",
+    "laji": "Ilmakivääri 10m",
+    "tulos": 612.4
+  },
+  {
+    "pvm": "2026-03-01",
+    "kilpailu": "Seuran kisa",
+    "ampuja": "Ville Hautala",
+    "laji": "Ilmakivääri 10m",
+    "tulos": 615.1
+  },
+  {
+    "pvm": "2026-02-20",
+    "kilpailu": "Aluekisa",
+    "ampuja": "Jyrki Pitkäranta",
+    "laji": "Ilmapistooli 10m",
+    "tulos": 565.0
+  }
+]
