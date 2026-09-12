@@ -10,6 +10,7 @@
             --primary: #0f172a; 
             --primary-light: #3b82f6; 
             --success: #10b981;
+            --danger: #ef4444;
             --bg: #f8fafc; 
             --card-bg: #ffffff; 
             --text: #1e293b; 
@@ -21,11 +22,14 @@
         header h1 { margin: 0; font-size: 1.8rem; }
         header p { margin: 8px 0 0 0; opacity: 0.8; font-size: 0.95rem; }
         .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
-        @media (min-width: 768px) { .grid { grid-template-columns: 320px 1fr; } }
+        @media (min-width: 768px) { .grid { grid-template-columns: 360px 1fr; } }
         .card { background: var(--card-bg); padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
         h2 { font-size: 1.1rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid var(--bg); padding-bottom: 8px; }
         label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.85rem; color: #475569; }
-        select { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        select, input, textarea { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
+        button { width: 100%; background-color: var(--primary-light); color: white; font-weight: 600; border: none; padding: 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-danger { background-color: var(--danger); margin-top: 6px; padding: 6px; font-size: 0.8rem; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
         .stat-box .number { font-size: 1.6rem; font-weight: bold; color: var(--primary-light); }
@@ -33,7 +37,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-        #statusText { font-size: 0.85rem; color: var(--success); margin-top: 10px; font-weight: 600; text-align: center; }
+        .ampuja-item { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -41,19 +45,39 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Automaattisesti päivittyvä tuloshistoria</p>
+        <p>Syötä ampujat ja hallitse tuloksia suoraan selaimessa</p>
     </header>
 
     <div class="grid">
+        <!-- Vasen sarake: Ampujat ja tuonti -->
         <div>
+            <div class="card">
+                <h2>Seurattavat Ampujat</h2>
+                <label for="uusiNimi">Nimi:</label>
+                <input type="text" id="uusiNimi" placeholder="Esim. Emma Virtanen">
+
+                <label for="uusiId">Sportti-ID:</label>
+                <input type="text" id="uusiId" placeholder="Esim. 60332562">
+
+                <button onclick="lisaaAmpuja()">+ Lisää Ampuja</button>
+                <div id="ampujatLista" style="margin-top: 12px;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Tietojen tuonti</h2>
+                <label for="jsonInput">Liitä KITI-tulokset (JSON):</label>
+                <textarea id="jsonInput" rows="4" placeholder="Liitä tulosdata tähän..."></textarea>
+                <button onclick="tallennaTuodutTulokset()" style="background-color: var(--success);">Tallenna tulokset</button>
+            </div>
+
             <div class="card">
                 <h2>Suodatus</h2>
                 <label for="lajiSelect">Laji:</label>
                 <select id="lajiSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki lajit</option></select>
-                <div id="statusText">Ladataan tuloksia...</div>
             </div>
         </div>
 
+        <!-- Oikea sarake: Visualisointi -->
         <div>
             <div class="card">
                 <h2>Yhteenveto</h2>
@@ -68,7 +92,7 @@
             <div class="card">
                 <h2>Tuloshistoria</h2>
                 <table>
-                    <thead><tr><th>Pvm</th><th>Kilpailu</th><th>Laji</th><th>Sarja</th><th>Tulos</th></tr></thead>
+                    <thead><tr><th>Pvm</th><th>Kilpailu</th><th>Ampuja</th><th>Laji</th><th>Tulos</th></tr></thead>
                     <tbody id="tulosTaulukko"></tbody>
                 </table>
             </div>
@@ -77,34 +101,77 @@
 </div>
 
 <script>
-let tulosData = [];
+let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
+let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
-async function lataaData() {
+function alusta() {
+    paivitaAmpujatLista();
+    paivitaValikot();
+    paivitaNakyma();
+}
+
+function lisaaAmpuja() {
+    const nimi = document.getElementById("uusiNimi").value.trim();
+    const id = document.getElementById("uusiId").value.trim();
+    if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
+
+    ampujat.push({ nimi, id });
+    localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
+    
+    document.getElementById("uusiNimi").value = "";
+    document.getElementById("uusiId").value = "";
+    paivitaAmpujatLista();
+}
+
+function poistaAmpuja(index) {
+    ampujat.splice(index, 1);
+    localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
+    paivitaAmpujatLista();
+}
+
+function paivitaAmpujatLista() {
+    const lista = document.getElementById("ampujatLista");
+    if (ampujat.length === 0) {
+        lista.innerHTML = '<p style="font-size:0.85rem; color:#94a3b8;">Ei vielä ampujia.</p>';
+        return;
+    }
+    lista.innerHTML = ampujat.map((a, i) => `
+        <div class="ampuja-item">
+            <span><b>${a.nimi}</b> (ID: ${a.id})</span>
+            <button class="btn-danger" onclick="poistaAmpuja(${i})">Poista</button>
+        </div>
+    `).join("");
+}
+
+function tallennaTuodutTulokset() {
+    const raw = document.getElementById("jsonInput").value.trim();
+    if (!raw) return alert("Liitä data ensin kenttään!");
+
     try {
-        // Haetaan data suoraan omasta reposta ilman proxyja!
-        const response = await fetch('data.json');
-        const resData = await response.json();
+        const parsed = JSON.parse(raw);
+        const rows = Array.isArray(parsed) ? parsed : (parsed.content || parsed.results || parsed.data || []);
         
-        const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
-        
-        tulosData = rows.map(row => {
+        const uudet = rows.map(row => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             return {
                 pvm: String(row.competitionStartDate || row.startDate || row.date || "2026-01-01").substring(0, 10),
                 kilpailu: String(row.competitionName || row.name || "Kilpailu"),
+                ampuja: ampujat.length > 0 ? ampujat[ampujat.length - 1].nimi : "Ampuja",
                 laji: String(row.eventName || row.sport || row.sportName || "Ampumaurheilu"),
-                sarja: String(row.seriesName || row.categoryName || "-"),
                 tulos: parseFloat(String(tRaw).replace(",", "."))
             };
         }).filter(r => r.tulos > 0);
 
-        document.getElementById("statusTextinnerText", `Ladattu ${tulosData.length} tulosta.`);
+        tulosData = [...tulosData, ...uudet];
+        localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
+        document.getElementById("jsonInput").value = "";
+        
         paivitaValikot();
         paivitaNakyma();
-    } catch (err) {
-        document.getElementById("statusText").style.color = "var(--danger)";
-        document.getElementById("statusText").innerText = "Dataa ei löytynyt. Aja GitHub Action.";
+        alert(`Tallennettiin ${uudet.length} tulosta!`);
+    } catch (e) {
+        alert("Virhe datan käsittelyssä. Varmista, että liitetty data on oikeassa muodossa.");
     }
 }
 
@@ -132,8 +199,8 @@ function paivitaNakyma() {
         <tr>
             <td>${d.pvm}</td>
             <td style="color: #64748b;">${d.kilpailu}</td>
+            <td><b>${d.ampuja}</b></td>
             <td>${d.laji}</td>
-            <td>${d.sarja}</td>
             <td><b>${d.tulos}</b></td>
         </tr>
     `).join("");
@@ -168,7 +235,7 @@ function piirraKaavio(data) {
     });
 }
 
-window.onload = lataaData;
+window.onload = alusta;
 </script>
 </body>
 </html>
