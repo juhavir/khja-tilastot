@@ -3,47 +3,51 @@ import json
 
 BASE_URL = "https://kiti.ampumaurheiluliitto.fi/api"
 
-# Hakusanat KhjA:n tunnistamiseen
-CLUB_KEYWORDS = ["KHJA", "KAUHAJOEN", "KAUHAJOKI"]
+# Tunnistetaan KhjA eri kirjoitusasuisina
+CLUB_NAMES = ["KHJA", "KAUHAJOEN AMPUJAT", "KAUHAJOKI", "KAUHAJOEN"]
 
-def is_khja(seura_str):
-    if not seura_str:
-        return False
-    seura = str(seura_str).upper()
-    return any(kw in seura for kw in CLUB_KEYWORDS)
+def check_club(row):
+    # Käydään läpi kaikki mahdolliset seuranimen kentät KITI:ssä
+    club_val = str(row.get("club") or row.get("clubName") or row.get("seura") or row.get("organization") or "").upper()
+    return any(name in club_val for name in CLUB_NAMES)
 
 def run():
-    print("Haetaan KITI-kilpailut...")
-    headers = {"User-Agent": "Mozilla/5.0"}
-    khja_results = []
+    print("Haetaan kilpailulista KITI-järjestelmästä...")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json"
+    }
     
+    khja_results = []
+
     try:
         r = requests.get(f"{BASE_URL}/competitions", headers=headers, timeout=15)
-        res_data = r.json() if r.status_code == 200 else []
+        if r.status_code != 200:
+            print(f"KITI API virhe: {r.status_code}")
+            return
+        
+        comps = r.json()
+        if isinstance(comps, dict):
+            comps = comps.get("content") or comps.get("competitions") or []
     except Exception as e:
-        print(f"Virhe: {e}")
-        res_data = []
+        print(f"Virhe kilpailulistan haussa: {e}")
+        comps = []
 
-    if isinstance(res_data, dict):
-        competitions = res_data.get("competitions") or res_data.get("content") or res_data.get("data") or []
-    elif isinstance(res_data, list):
-        competitions = res_data
-    else:
-        competitions = []
+    print(f"Löytyi {len(comps)} kilpailua. Etsitään aitoja KhjA-ampujia...")
 
-    print(f"Käsitellään {len(competitions)} kilpailua...")
-
-    for comp in competitions:
+    # Käydään läpi kilpailut
+    for comp in comps:
         if not isinstance(comp, dict):
             continue
 
         comp_id = comp.get("id")
-        comp_date = (comp.get("startDate") or comp.get("date") or "2026-01-01")[:10]
-        comp_name = comp.get("name", "Kilpailu")
+        comp_date = (comp.get("startDate") or comp.get("date") or comp.get("endDate") or "2026-01-01")[:10]
+        comp_name = comp.get("name") or comp.get("title") or "Kilpailu"
 
         if not comp_id:
             continue
 
+        # Haetaan kisan tulokset
         try:
             res = requests.get(f"{BASE_URL}/competitions/{comp_id}/results", headers=headers, timeout=5)
             if res.status_code != 200:
@@ -51,6 +55,7 @@ def run():
 
             data = res.json()
             rows = []
+            
             if isinstance(data, list):
                 rows = data
             elif isinstance(data, dict):
@@ -59,40 +64,37 @@ def run():
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                
-                seura = row.get("club") or row.get("seura") or row.get("clubName") or row.get("organization", "")
-                
-                # Tarkistetaan kuuluuko edustukseen KhjA
-                if is_khja(seura):
-                    ampuja = row.get("athleteName") or f"{row.get('firstName', '')} {row.get('lastName', '')}".strip() or "KhjA Ampuja"
+
+                if check_club(row):
+                    # Haetaan ampujan nimi KITI:n eri rakennevaihtoehdoista
+                    firstName = row.get("firstName") or row.get("first_name") or ""
+                    lastName = row.get("lastName") or row.get("last_name") or ""
+                    full_name = f"{lastName} {firstName}".strip()
+                    
+                    if not full_name:
+                        full_name = row.get("athleteName") or row.get("name") or row.get("competitor") or "Tuntematon Ampuja"
+
                     laji = row.get("eventName") or row.get("sport") or comp.get("sportName") or "Ampumaurheilu"
-                    tulos = row.get("score") or row.get("totalScore") or row.get("result", 0)
+                    tulos = row.get("score") or row.get("totalScore") or row.get("result") or row.get("total", 0)
 
                     try:
                         tulos_val = float(str(tulos).replace(",", "."))
-                    except ValueError:
+                    except (ValueError, TypeError):
                         continue
 
                     khja_results.append({
                         "pvm": comp_date,
                         "kilpailu": comp_name,
-                        "ampuja": ampuja,
+                        "ampuja": full_name,
                         "laji": laji,
                         "tulos": tulos_val
                     })
         except Exception:
             continue
 
-    # Jos KITI-rajapinta ei palauta uusia tuloksia, lisätään perusrakenne varmistamaan sivun toiminta
-    if not khja_results:
-        print("Ei löytynyt tuloksia KITI:stä hakuhetkellä. Luodaan perusdata...")
-        khja_results = [
-            { "pvm": "2026-02-15", "kilpailu": "Kansallinen kisa", "ampuja": "Ville Hautala", "laji": "Ilmakivääri 10m", "tulos": 612.4 },
-            { "pvm": "2026-03-01", "kilpailu": "Seuran kisa", "ampuja": "Ville Hautala", "laji": "Ilmakivääri 10m", "tulos": 615.1 },
-            { "pvm": "2026-02-20", "kilpailu": "Aluekisa", "ampuja": "Jyrki Pitkäranta", "laji": "Ilmapistooli 10m", "tulos": 565.0 }
-        ]
-
-    print(f"Tallennetaan {len(khja_results)} tulosta tiedostoon data.json...")
+    print(f"Löytyi yhteensä {len(khja_results)} aitoa KhjA-tulosriviä.")
+    
+    # Tallennetaan löydetyt tulokset data.json-tiedostoon
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(khja_results, f, ensure_ascii=False, indent=2)
 
