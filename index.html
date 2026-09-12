@@ -219,12 +219,12 @@ let myChart = null;
 
 async function lataaData() {
     try {
-        // Luetaan GitHub-automaation luoma data.json
+        // Luetaan automaation generoima data.json
         const response = await fetch('data.json?v=' + new Date().getTime());
-        if (!response.ok) throw new Error("Dataa ei saatavilla");
+        if (!response.ok) throw new Error("data.json ei löydy");
         tulosData = await response.json();
     } catch (e) {
-        console.log("Odotetaan ensimmäistä automaattiajoa...");
+        console.log("Dataa ei löytynyt vielä, näytetään tyhjä tila:", e);
         tulosData = [];
     }
     alustaSovellus();
@@ -236,6 +236,12 @@ function alustaSovellus() {
 }
 
 function paivitaValikot() {
+    if (!tulosData || tulosData.length === 0) {
+        document.getElementById("lajiSelect").innerHTML = '<option value="Kaikki">Ei dataa (Aja Actions)</option>';
+        document.getElementById("ampujaSelect").innerHTML = '<option value="Kaikki">Ei dataa (Aja Actions)</option>';
+        return;
+    }
+
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
     const ampujat = ["Kaikki", ...new Set(tulosData.map(d => d.ampuja))];
 
