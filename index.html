@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KhjA - Kauhajoen Ampujat | KITI Seuranta</title>
+    <title>KhjA - Kauhajoen Ampujat | KITI Vertailu & Tilastot</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -22,7 +22,7 @@
             padding: 20px;
         }
 
-        .container { max-width: 1100px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
 
         header {
             background-color: var(--primary);
@@ -43,7 +43,7 @@
         }
 
         @media (min-width: 768px) {
-            .grid { grid-template-columns: 320px 1fr; }
+            .grid { grid-template-columns: 340px 1fr; }
         }
 
         .card {
@@ -57,7 +57,7 @@
         h2 { font-size: 1.1rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;}
 
         label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.85rem; color: #475569; }
-        select, input, textarea {
+        select, input {
             width: 100%;
             padding: 9px;
             margin-top: 4px;
@@ -80,8 +80,6 @@
         }
 
         button:hover { background-color: var(--primary); }
-        .btn-success { background-color: #059669; }
-        .btn-success:hover { background-color: #047857; }
         .btn-danger { background-color: #ef4444; margin-top: 0; padding: 4px 8px; font-size: 0.75rem; width: auto; }
 
         .stats-grid {
@@ -122,13 +120,6 @@
             font-size: 0.75rem;
             font-weight: 600;
         }
-
-        #statusText {
-            font-size: 0.8rem;
-            color: #2563eb;
-            margin-top: 8px;
-            font-weight: 600;
-        }
     </style>
 </head>
 <body>
@@ -136,62 +127,60 @@
 <div class="container">
     <header>
         <h1>🎯 Kauhajoen Ampujat (KhjA)</h1>
-        <p>KITI-tulosseuranta Sportti-ID kohdennuksella</p>
+        <p>Seuran ampujien KITI-tuloskehitys ja keskinäinen vertailu</p>
     </header>
 
     <div class="grid">
-        <!-- Vasen sarake -->
+        <!-- Vasen sarake: Hallinta ja Suodattimet -->
         <div>
-            <!-- Syötä Sportti-ID -->
+            <!-- Ampujien hallinta -->
             <div class="card">
-                <h2>Lisää Seurattava Ampuja</h2>
+                <h2>Seurattavat Ampujat</h2>
                 <label for="uusiNimi">Ampujan Nimi:</label>
                 <input type="text" id="uusiNimi" placeholder="Esim. Emma Virtanen">
 
                 <label for="uusiId">Sportti-ID:</label>
                 <input type="text" id="uusiId" placeholder="Esim. 60332562">
 
-                <button onclick="lisaaAmpuja()">+ Tallenna Ampuja</button>
+                <button onclick="lisaaAmpuja()">+ Lisää Seuraan</button>
                 
-                <h3 style="font-size: 0.85rem; margin-top: 15px; color: #475569;">Tallennetut KhjA-ampujat:</h3>
+                <h3 style="font-size: 0.85rem; margin-top: 15px; color: #475569;">Aktiiviset KhjA-ampujat:</h3>
                 <div id="ampujatContainer"></div>
-                
-                <button class="btn-success" onclick="haeKitiTulokset()" style="margin-top: 15px;">🔄 Hae KITI-tulokset</button>
-                <div id="statusText"></div>
             </div>
 
-            <!-- Suodatus -->
+            <!-- Suodatus ja aikaväli -->
             <div class="card">
-                <h2>Suodata Tuloksia</h2>
+                <h2>Tilastosuodatin & Vertailu</h2>
+                
                 <label for="lajiSelect">Laji:</label>
                 <select id="lajiSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki lajit</option></select>
 
-                <label for="ampujaSelect">KhjA Ampuja:</label>
-                <select id="ampujaSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki ampujat</option></select>
-            </div>
+                <label for="ampujaSelect">Kohdenna ampujaan:</label>
+                <select id="ampujaSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki (Seuravertailu)</option></select>
 
-            <!-- Manuaalinen lisäys tarvittaessa -->
-            <div class="card">
-                <h2>Lisää Tulos Käsin</h2>
-                <textarea id="pikaInput" rows="3" placeholder="Muoto: Pvm, Ampuja, Laji, Tulos&#10;Esim: 2026-03-01, Emma Virtanen, Ilmakivääri 10m, 614.5"></textarea>
-                <button onclick="lisaaTuloksetKasin()">Tuo Tulos</button>
+                <label for="aikavaliSelect">Aikaväli:</label>
+                <select id="aikavaliSelect" onchange="paivitaNakyma()">
+                    <option value="kaikki">Kaikki historiatiedot</option>
+                    <option value="vuosi">Viimeisin vuosi</option>
+                    <option value="6kk">Viimeisimmät 6 kk</option>
+                </select>
             </div>
         </div>
 
-        <!-- Oikea sarake -->
+        <!-- Oikea sarake: Visualisointi ja Tulokset -->
         <div>
             <div class="card">
-                <h2>Tuloskehitys & Tilastot</h2>
+                <h2>KhjA Tuloskehitys & Vertailukaavio</h2>
                 <div class="stats-grid">
                     <div class="stat-box"><div class="number" id="statKisaLkm">0</div><div class="label">Startteja</div></div>
-                    <div class="stat-box"><div class="number" id="statParas">-</div><div class="label">Ennätys (PB)</div></div>
+                    <div class="stat-box"><div class="number" id="statParas">-</div><div class="label">Seuran Ennätys</div></div>
                     <div class="stat-box"><div class="number" id="statKeskiarvo">-</div><div class="label">Keskiarvo</div></div>
                 </div>
                 <canvas id="tulosKaavio" height="130"></canvas>
             </div>
 
             <div class="card">
-                <h2>KhjA Tuloshistoria</h2>
+                <h2>KITI Tuloshistoria</h2>
                 <table>
                     <thead>
                         <tr>
@@ -209,9 +198,23 @@
 </div>
 
 <script>
-let tulosData = JSON.parse(localStorage.getItem("khja_id_tulokset")) || [];
-let ampujatData = JSON.parse(localStorage.getItem("khja_id_ampujat")) || [];
+let tulosData = [];
+let ampujatData = JSON.parse(localStorage.getItem("khja_vertailu_ampujat")) || [
+    { nimi: "Emma Virtanen", id: "60332562" }
+];
 let myChart = null;
+
+async function lataaKitiData() {
+    try {
+        const res = await fetch('data.json?v=' + new Date().getTime());
+        if (res.ok) {
+            tulosData = await res.json();
+        }
+    } catch (e) {
+        console.log("KITI-dataa ladataan taustalla...");
+    }
+    alustaSovellus();
+}
 
 function alustaSovellus() {
     paivitaAmpujatLista();
@@ -221,141 +224,31 @@ function alustaSovellus() {
 
 function paivitaAmpujatLista() {
     const container = document.getElementById("ampujatContainer");
-    if (ampujatData.length === 0) {
-        container.innerHTML = '<p style="font-size:0.8rem; color:#94a3b8;">Ei tallennettuja ampujia.</p>';
-    } else {
-        container.innerHTML = ampujatData.map((a, i) => `
-            <div class="ampuja-item">
-                <span><b>${a.nimi}</b> ${a.id ? '<span class="badge-id">ID: ' + a.id + '</span>' : ''}</span>
-                <button class="btn-danger" onclick="poistaAmpuja(${i})">X</button>
-            </div>
-        `).join("");
-    }
-    localStorage.setItem("khja_id_ampujat", JSON.stringify(ampujatData));
+    container.innerHTML = ampujatData.map((a, i) => `
+        <div class="ampuja-item">
+            <span><b>${a.nimi}</b> ${a.id ? '<span class="badge-id">ID: ' + a.id + '</span>' : ''}</span>
+            <button class="btn-danger" onclick="poistaAmpuja(${i})">X</button>
+        </div>
+    `).join("");
+    localStorage.setItem("khja_vertailu_ampujat", JSON.stringify(ampujatData));
 }
 
 function lisaaAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
-
-    if (!nimi) {
-        return alert("Syötä vähintään ampujan nimi!");
-    }
+    if (!nimi) return alert("Syötä ampujan nimi!");
 
     ampujatData.push({ nimi: nimi, id: String(id) });
     document.getElementById("uusiNimi").value = "";
     document.getElementById("uusiId").value = "";
     paivitaAmpujatLista();
+    paivitaValikot();
 }
 
 function poistaAmpuja(index) {
     ampujatData.splice(index, 1);
     paivitaAmpujatLista();
-}
-
-// Kevyt ja turvallinen API-haku selaimessa
-async function haeKitiTulokset() {
-    if (ampujatData.length === 0) {
-        return alert("Lisää ensin vähintään yksi ampuja!");
-    }
-
-    const statusEl = document.getElementById("statusText");
-    statusEl.innerText = "Yhdistetään KITI-tietokantaan...";
-
-    const PROXY = "https://api.allorigins.win/raw?url=";
-    const KITI_COMPETITIONS_URL = "https://kiti.ampumaurheiluliitto.fi/api/competitions";
-
-    try {
-        const response = await fetch(PROXY + encodeURIComponent(KITI_COMPETITIONS_URL));
-        if (!response.ok) throw new Error("KITI-rajapintaan ei saatu yhteyttä.");
-
-        let comps = await response.json();
-        if (comps.content) comps = comps.content;
-        if (comps.competitions) comps = comps.competitions;
-        if (!Array.isArray(comps)) comps = [];
-
-        let uudetTulokset = [];
-        statusEl.innerText = `Löytyi ${comps.length} kilpailua. Haetaan tuloksia...`;
-
-        // Käydään läpi 15 uusinta kilpailua (estää jumittumisen)
-        const compList = comps.slice(0, 15);
-        let count = 0;
-
-        for (let comp of compList) {
-            if (!comp.id) continue;
-            count++;
-            statusEl.innerText = `Tarkistetaan kilpailua ${count}/${compList.length}...`;
-
-            try {
-                const resUrl = `https://kiti.ampumaurheiluliitto.fi/api/competitions/${comp.id}/results`;
-                const res = await fetch(PROXY + encodeURIComponent(resUrl));
-                if (!res.ok) continue;
-
-                let data = await res.json();
-                let rows = Array.isArray(data) ? data : (data.results || data.content || []);
-
-                for (let r of rows) {
-                    const rId = String(r.licenseNumber || r.sportId || r.personId || r.athleteId || "").trim();
-                    const rName = String(r.athleteName || `${r.lastName || ''} ${r.firstName || ''}`).trim().toLowerCase();
-
-                    // Etsitään täsmäystä ID:llä tai Nimellä
-                    const kohdeAmpuja = ampujatData.find(a => {
-                        const matchId = a.id && String(a.id).trim() === rId;
-                        const matchName = a.nimi && rName.includes(a.nimi.toLowerCase());
-                        return matchId || matchName;
-                    });
-                    
-                    if (kohdeAmpuja) {
-                        const tulosStr = String(r.score || r.totalScore || r.result || 0).replace(",", ".");
-                        uudetTulokset.push({
-                            pvm: (comp.startDate || comp.date || "2026-01-01").substring(0, 10),
-                            ampuja: kohdeAmpuja.nimi,
-                            laji: r.eventName || r.sport || comp.sportName || "Ampumaurheilu",
-                            tulos: parseFloat(tulosStr)
-                        });
-                    }
-                }
-            } catch (e) {
-                continue;
-            }
-        }
-
-        if (uudetTulokset.length > 0) {
-            tulosData = uudetTulokset;
-            localStorage.setItem("khja_id_tulokset", JSON.stringify(tulosData));
-            paivitaValikot();
-            paivitaNakyma();
-            statusEl.innerText = `Valmis! Päivitetty ${uudetTulokset.length} tulosta.`;
-        } else {
-            statusEl.innerText = "Ei löydetty uusia tuloksia näille ampujille KITI:stä.";
-        }
-    } catch (err) {
-        statusEl.innerText = "Haku epäonnistui selaimen suojausrajoituksen vuoksi.";
-        alert("Automaattihaku ei saanut yhteyttä KITI:n rajapintaan selaimesi suojauksista johtuen.\n\nVoit syöttää Emma Virtasen tulokset suoraan 'Lisää Tulos Käsin' -kenttään!");
-    }
-}
-
-function lisaaTuloksetKasin() {
-    const input = document.getElementById("pikaInput").value.trim();
-    if (!input) return;
-
-    const rivit = input.split("\n");
-    rivit.forEach(rivi => {
-        const osat = rivi.split(",");
-        if (osat.length >= 4) {
-            tulosData.push({
-                pvm: osat[0].trim(),
-                ampuja: osat[1].trim(),
-                laji: osat[2].trim(),
-                tulos: parseFloat(osat[3].trim())
-            });
-        }
-    });
-
-    localStorage.setItem("khja_id_tulokset", JSON.stringify(tulosData));
-    document.getElementById("pikaInput").value = "";
     paivitaValikot();
-    paivitaNakyma();
 }
 
 function paivitaValikot() {
@@ -369,11 +262,25 @@ function paivitaValikot() {
 function suodataData() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuAmpuja = document.getElementById("ampujaSelect").value;
+    const aikavali = document.getElementById("aikavaliSelect").value;
+
+    const nykyhetki = new Date();
 
     return tulosData.filter(d => {
         const lajiOk = (valittuLaji === "Kaikki" || d.laji === valittuLaji);
         const ampujaOk = (valittuAmpuja === "Kaikki" || d.ampuja === valittuAmpuja);
-        return lajiOk && ampujaOk;
+
+        let aikaOk = true;
+        if (aikavali !== "kaikki") {
+            const dPvm = new Date(d.pvm);
+            const diffAika = Math.abs(nykyhetki - dPvm);
+            const diffPaivat = Math.ceil(diffAika / (1000 * 60 * 60 * 24));
+            
+            if (aikavali === "vuosi" && diffPaivat > 365) aikaOk = false;
+            if (aikavali === "6kk" && diffPaivat > 180) aikaOk = false;
+        }
+
+        return lajiOk && ampujaOk && aikaOk;
     });
 }
 
@@ -409,29 +316,38 @@ function piirraKaavio(data) {
 
     if (myChart) { myChart.destroy(); }
 
+    // Ryhmitellään tulokset ampujittain rinnakkain vertailua varten
+    const ampujat = [...new Set(sorted.map(d => d.ampuja))];
+    const variPaletti = ['#2563eb', '#dc2626', '#059669', '#d97706', '#9333ea'];
+
+    const datasets = ampujat.map((amp, idx) => {
+        const ampujaData = sorted.filter(d => d.ampuja === amp);
+        return {
+            label: amp,
+            data: ampujaData.map(d => ({ x: d.pvm, y: d.tulos })),
+            borderColor: variPaletti[idx % variPaletti.length],
+            borderWidth: 2,
+            tension: 0.2,
+            fill: false
+        };
+    });
+
     myChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: sorted.map(d => `${d.pvm} (${d.ampuja})`),
-            datasets: [{
-                label: 'Tulos',
-                data: sorted.map(d => d.tulos),
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.25
-            }]
-        },
+        data: { datasets: datasets },
         options: {
             responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: false } }
+            plugins: {
+                legend: { display: true, position: 'top' }
+            },
+            scales: {
+                x: { type: 'category' }
+            }
         }
     });
 }
 
-window.onload = alustaSovellus;
+window.onload = lataaKitiData;
 </script>
 </body>
 </html>
