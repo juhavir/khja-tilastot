@@ -3,40 +3,39 @@ import json
 
 BASE_URL = "https://kiti.ampumaurheiluliitto.fi/api"
 
-# 1. Kauhajoen Ampujien tunnistus ja tunnetut ampujat
-KHJA_ALIASES = ["KHJA", "KAUHAJOEN AMPUJAT", "KAUHAJOKI"]
-
-def is_khja_athlete(row):
-    # Tarkistetaan kuuluuko seura KhjA-ryhmään
-    seura = str(row.get("club") or row.get("seura") or row.get("clubName") or row.get("organization") or "").upper()
-    if any(alias in seura for alias in KHJA_ALIASES):
-        return True
-    return False
+# Tähän määritellään seurattavien ampujien Sportti-ID:t ja nimet
+AMPUSLISTA = [
+    {"nimi": "Emma Virtanen", "id": "60332562"},
+    # Voit lisätä muita ampujia tähän tyyliin:
+    # {"nimi": "Matti Meikäläinen", "id": "12345678"}
+]
 
 def run():
-    print("Aloitetaan KhjA-ampujien ja tulosten haku KITI:stä...")
+    print("Aloitetaan täsmällinen KITI-tuloshaku...")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json"
     }
     
     khja_results = []
-
+    
     try:
         r = requests.get(f"{BASE_URL}/competitions", headers=headers, timeout=15)
         if r.status_code != 200:
-            print(f"KITI API vastasi virheellä: {r.status_code}")
+            print(f"KITI-rajapinta palautti virheen: {r.status_code}")
             return
+        
         comps = r.json()
         if isinstance(comps, dict):
             comps = comps.get("content") or comps.get("competitions") or []
     except Exception as e:
-        print(f"Virhe kisoja haettaessa: {e}")
+        print(f"Virhe kilpailujen haussa: {e}")
         comps = []
 
-    print(f"Löytyi {len(comps)} kilpailua KITI-kalenterista. Suodatetaan KhjA:n tulokset...")
+    print(f"Haettu {len(comps)} kilpailua. Suodatetaan urheilijoiden ID:t...")
 
-    # Käydään läpi kilpailut
+    target_ids = {str(a["id"]).strip(): a["nimi"] for a in AMPUSLISTA if "id" in a}
+
     for comp in comps:
         if not isinstance(comp, dict):
             continue
@@ -60,15 +59,20 @@ def run():
                 if not isinstance(row, dict):
                     continue
 
-                # Jos ampuja edustaa Kauhajoen Ampujia (KhjA)
-                if is_khja_athlete(row):
-                    first_name = row.get("firstName") or row.get("first_name") or ""
-                    last_name = row.get("lastName") or row.get("last_name") or ""
-                    full_name = f"{last_name} {first_name}".strip()
-                    
-                    if not full_name:
-                        full_name = row.get("athleteName") or row.get("name") or "KhjA Ampuja"
+                # Tarkistetaan Sportti-ID eri kentistä
+                row_id = str(row.get("licenseNumber") or row.get("sportId") or row.get("personId") or row.get("athleteId") or "").strip()
+                row_name = str(row.get("athleteName") or f"{row.get('lastName', '')} {row.get('firstName', '')}").strip()
 
+                matched_name = None
+                if row_id in target_ids:
+                    matched_name = target_ids[row_id]
+                else:
+                    for tid, tname in target_ids.items():
+                        if tname.lower() in row_name.lower() and len(tname) > 3:
+                            matched_name = tname
+                            break
+
+                if matched_name:
                     laji = row.get("eventName") or row.get("sport") or comp.get("sportName") or "Ampumaurheilu"
                     tulos = row.get("score") or row.get("totalScore") or row.get("result", 0)
 
@@ -80,16 +84,16 @@ def run():
                     khja_results.append({
                         "pvm": comp_date,
                         "kilpailu": comp_name,
-                        "ampuja": full_name,
+                        "ampuja": matched_name,
                         "laji": laji,
                         "tulos": tulos_val
                     })
         except Exception:
             continue
 
-    print(f"Haettu yhteensä {len(khja_results)} KhjA:n tulosta.")
+    print(f"Haettu yhteensä {len(khja_results)} tulosta.")
 
-    # Tallennetaan löydetyt tulokset data.json tiedostoon
+    # Tallennetaan löydetyt tulokset data.json-tiedostoon
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(khja_results, f, ensure_ascii=False, indent=2)
 
