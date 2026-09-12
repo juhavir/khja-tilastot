@@ -122,6 +122,13 @@
             font-size: 0.75rem;
             font-weight: 600;
         }
+
+        #statusText {
+            font-size: 0.8rem;
+            color: #2563eb;
+            margin-top: 8px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -139,17 +146,18 @@
             <div class="card">
                 <h2>Lisää Seurattava Ampuja</h2>
                 <label for="uusiNimi">Ampujan Nimi:</label>
-                <input type="text" id="uusiNimi" placeholder="Esim. Matti Meikäläinen">
+                <input type="text" id="uusiNimi" placeholder="Esim. Emma Virtanen">
 
-                <label for="uusiId">Sportti-ID (Pakollinen):</label>
-                <input type="text" id="uusiId" placeholder="Esim. 12345678">
+                <label for="uusiId">Sportti-ID:</label>
+                <input type="text" id="uusiId" placeholder="Esim. 60332562">
 
-                <button onclick="lisaaAmpuja()">+ Tallenna Sportti-ID</button>
+                <button onclick="lisaaAmpuja()">+ Tallenna Ampuja</button>
                 
                 <h3 style="font-size: 0.85rem; margin-top: 15px; color: #475569;">Tallennetut KhjA-ampujat:</h3>
                 <div id="ampujatContainer"></div>
                 
-                <button class="btn-success" onclick="haeKitiTulokset()" style="margin-top: 15px;">🔄 Hae KITI-tulokset ID:illä</button>
+                <button class="btn-success" onclick="haeKitiTulokset()" style="margin-top: 15px;">🔄 Hae KITI-tulokset</button>
+                <div id="statusText"></div>
             </div>
 
             <!-- Suodatus -->
@@ -165,7 +173,7 @@
             <!-- Manuaalinen lisäys tarvittaessa -->
             <div class="card">
                 <h2>Lisää Tulos Käsin</h2>
-                <textarea id="pikaInput" rows="2" placeholder="Pvm, Ampuja, Laji, Tulos&#10;2026-03-01, Matti Meikäläinen, Ilmakivääri 10m, 614.5"></textarea>
+                <textarea id="pikaInput" rows="3" placeholder="Muoto: Pvm, Ampuja, Laji, Tulos&#10;Esim: 2026-03-01, Emma Virtanen, Ilmakivääri 10m, 614.5"></textarea>
                 <button onclick="lisaaTuloksetKasin()">Tuo Tulos</button>
             </div>
         </div>
@@ -183,7 +191,7 @@
             </div>
 
             <div class="card">
-                <h2>Kohdennetut KITI-Tulokset</h2>
+                <h2>KhjA Tuloshistoria</h2>
                 <table>
                     <thead>
                         <tr>
@@ -214,11 +222,11 @@ function alustaSovellus() {
 function paivitaAmpujatLista() {
     const container = document.getElementById("ampujatContainer");
     if (ampujatData.length === 0) {
-        container.innerHTML = '<p style="font-size:0.8rem; color:#94a3b8;">Ei tallennettuja Sportti-ID:itä.</p>';
+        container.innerHTML = '<p style="font-size:0.8rem; color:#94a3b8;">Ei tallennettuja ampujia.</p>';
     } else {
         container.innerHTML = ampujatData.map((a, i) => `
             <div class="ampuja-item">
-                <span><b>${a.nimi}</b> <span class="badge-id">ID: ${a.id}</span></span>
+                <span><b>${a.nimi}</b> ${a.id ? '<span class="badge-id">ID: ' + a.id + '</span>' : ''}</span>
                 <button class="btn-danger" onclick="poistaAmpuja(${i})">X</button>
             </div>
         `).join("");
@@ -230,8 +238,8 @@ function lisaaAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
 
-    if (!nimi || !id) {
-        return alert("Syötä sekä ampujan nimi että Sportti-ID!");
+    if (!nimi) {
+        return alert("Syötä vähintään ampujan nimi!");
     }
 
     ampujatData.push({ nimi: nimi, id: String(id) });
@@ -245,19 +253,21 @@ function poistaAmpuja(index) {
     paivitaAmpujatLista();
 }
 
+// Kevyt ja turvallinen API-haku selaimessa
 async function haeKitiTulokset() {
     if (ampujatData.length === 0) {
-        return alert("Lisää ensin vähintään yksi ampuja ja Sportti-ID!");
+        return alert("Lisää ensin vähintään yksi ampuja!");
     }
 
-    alert("Haetaan KITI-tuloksia... Odota hetki.");
+    const statusEl = document.getElementById("statusText");
+    statusEl.innerText = "Yhdistetään KITI-tietokantaan...";
 
-    const PROXY = "https://corsproxy.io/?";
+    const PROXY = "https://api.allorigins.win/raw?url=";
     const KITI_COMPETITIONS_URL = "https://kiti.ampumaurheiluliitto.fi/api/competitions";
 
     try {
         const response = await fetch(PROXY + encodeURIComponent(KITI_COMPETITIONS_URL));
-        if (!response.ok) throw new Error("Yhteysvirhe KITI-rajapintaan");
+        if (!response.ok) throw new Error("KITI-rajapintaan ei saatu yhteyttä.");
 
         let comps = await response.json();
         if (comps.content) comps = comps.content;
@@ -265,10 +275,17 @@ async function haeKitiTulokset() {
         if (!Array.isArray(comps)) comps = [];
 
         let uudetTulokset = [];
+        statusEl.innerText = `Löytyi ${comps.length} kilpailua. Haetaan tuloksia...`;
 
-        for (let comp of comps.slice(0, 30)) {
+        // Käydään läpi 15 uusinta kilpailua (estää jumittumisen)
+        const compList = comps.slice(0, 15);
+        let count = 0;
+
+        for (let comp of compList) {
             if (!comp.id) continue;
-            
+            count++;
+            statusEl.innerText = `Tarkistetaan kilpailua ${count}/${compList.length}...`;
+
             try {
                 const resUrl = `https://kiti.ampumaurheiluliitto.fi/api/competitions/${comp.id}/results`;
                 const res = await fetch(PROXY + encodeURIComponent(resUrl));
@@ -279,7 +296,14 @@ async function haeKitiTulokset() {
 
                 for (let r of rows) {
                     const rId = String(r.licenseNumber || r.sportId || r.personId || r.athleteId || "").trim();
-                    const kohdeAmpuja = ampujatData.find(a => String(a.id).trim() === rId);
+                    const rName = String(r.athleteName || `${r.lastName || ''} ${r.firstName || ''}`).trim().toLowerCase();
+
+                    // Etsitään täsmäystä ID:llä tai Nimellä
+                    const kohdeAmpuja = ampujatData.find(a => {
+                        const matchId = a.id && String(a.id).trim() === rId;
+                        const matchName = a.nimi && rName.includes(a.nimi.toLowerCase());
+                        return matchId || matchName;
+                    });
                     
                     if (kohdeAmpuja) {
                         const tulosStr = String(r.score || r.totalScore || r.result || 0).replace(",", ".");
@@ -301,12 +325,13 @@ async function haeKitiTulokset() {
             localStorage.setItem("khja_id_tulokset", JSON.stringify(tulosData));
             paivitaValikot();
             paivitaNakyma();
-            alert(`Löytyi ${uudetTulokset.length} tulosta!`);
+            statusEl.innerText = `Valmis! Päivitetty ${uudetTulokset.length} tulosta.`;
         } else {
-            alert("Ei löytynyt uusia tuloksia näille Sportti-ID:ille KITI:n kisoista.");
+            statusEl.innerText = "Ei löydetty uusia tuloksia näille ampujille KITI:stä.";
         }
     } catch (err) {
-        alert("Virhe haussa: " + err.message);
+        statusEl.innerText = "Haku epäonnistui selaimen suojausrajoituksen vuoksi.";
+        alert("Automaattihaku ei saanut yhteyttä KITI:n rajapintaan selaimesi suojauksista johtuen.\n\nVoit syöttää Emma Virtasen tulokset suoraan 'Lisää Tulos Käsin' -kenttään!");
     }
 }
 
