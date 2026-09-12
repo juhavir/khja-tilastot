@@ -156,36 +156,6 @@ async function fetchKiti(url) {
     throw new Error("Yhteys estetty.");
 }
 
-function etsiKaikkiTulokset(data, oletusLaji = "Ampumaurheilu") {
-    let results = [];
-    if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-        let laji = data.eventName || data.sportName || data.categoryName || data.seriesName || oletusLaji;
-        let pvm = data.competitionStartDate || data.startDate || data.date || data.competitionDate || "";
-        let kisa = data.competitionName || data.name || data.title || "Kilpailu";
-        let tulosRaw = data.score !== undefined ? data.score : (data.totalScore !== undefined ? data.totalScore : (data.result !== undefined ? data.result : data.total));
-
-        if (tulosRaw !== undefined && tulosRaw !== null && tulosRaw !== "") {
-            results.push({
-                pvm: String(pvm).substring(0, 10),
-                kilpailu: String(kisa),
-                laji: String(laji),
-                tulos: parseFloat(String(tulosRaw).replace(",", "."))
-            });
-        }
-
-        for (let key in data) {
-            if (typeof data[key] === 'object') {
-                results = results.concat(etsiKaikkiTulokset(data[key], laji));
-            }
-        }
-    } else if (Array.isArray(data)) {
-        for (let item of data) {
-            results = results.concat(etsiKaikkiTulokset(item, oletusLaji));
-        }
-    }
-    return results;
-}
-
 async function haeTiedot() {
     if (ampujatData.length === 0) return alert("Lisää ensin vähintään yksi ampuja listalle.");
     
@@ -194,13 +164,14 @@ async function haeTiedot() {
     
     haeBtn.disabled = true;
     statusEl.style.color = "#3b82f6";
-    statusEl.innerText = "Haetaan urheilijoiden tuloksia KITI:stä...";
+    statusEl.innerText = "Yhdistetään KITI:seen...";
     let uudetTulokset = [];
 
     try {
         for (let ampuja of ampujatData) {
             statusEl.innerText = `Haetaan ID:llä ${ampuja.id} (${ampuja.nimi})...`;
             
+            // 1. Haetaan Sportti-ID:llä suoraan oikea sisäinen ID
             const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${ampuja.id}&limit=5&page=1`;
             
             try {
@@ -211,33 +182,29 @@ async function haeTiedot() {
                     const internalId = ath.id || ath.personId;
                     if (!internalId) continue;
 
-                    // Kokeillaan useampaa eri osoitevaihtoehtoa tuloksille
-                    const urlsToTry = [
-                        `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}`,
-                        `https://kiti.ampumaurheiluliitto.fi/api/athletes/${internalId}/results`,
-                        `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete&ordering=competition_start_date&athlete=${internalId}`
-                    ];
-
-                    for (let targetUrl of urlsToTry) {
-                        try {
-                            const resData = await fetchKiti(targetUrl);
-                            const loydetytRivit = etsiKaikkiTulokset(resData);
-                            
-                            if (loydetytRivit.length > 0) {
-                                for (let r of loydetytRivit) {
-                                    if (r.tulos > 0) {
-                                        uudetTulokset.push({
-                                            pvm: r.pvm && r.pvm.match(/^\d{4}-\d{2}-\d{2}$/) ? r.pvm : "2026-01-01",
-                                            kilpailu: r.kilpailu,
-                                            ampuja: ampuja.nimi,
-                                            laji: r.laji,
-                                            tulos: r.tulos
-                                        });
-                                    }
-                                }
-                                break; // Löytyi tuloksia, siirrytään seuraavaan osoitteeseen
-                            }
-                        } catch (err) {}
+                    // 2. Tehdään täsmälleen sama kutsu kuin kuvassasi näkyi
+                    const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete&ordering=competition_start_date&athlete=${internalId}`;
+                    const resData = await fetchKiti(resultsUrl);
+                    
+                    const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
+                    
+                    for (let row of rows) {
+                        // Poimitaan tiedot suoraan oikeista kentistä
+                        const pvm = row.competitionStartDate || row.startDate || row.date || "2026-01-01";
+                        const kisaNimi = row.competitionName || row.name || "Kilpailu";
+                        const lajiNimi = row.eventName || row.sport || row.sportName || "Ampumaurheilu";
+                        const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
+                        const tVal = parseFloat(String(tRaw).replace(",", "."));
+                        
+                        if (tVal > 0) {
+                            uudetTulokset.push({
+                                pvm: String(pvm).substring(0, 10),
+                                kilpailu: String(kisaNimi),
+                                ampuja: ampuja.nimi,
+                                laji: String(lajiNimi),
+                                tulos: tVal
+                            });
+                        }
                     }
                 }
             } catch (e) {
@@ -266,7 +233,7 @@ async function haeTiedot() {
             paivitaNakyma();
         } else {
             statusEl.style.color = "#f59e0b";
-            statusEl.innerText = "Urheilija löytyi, mutta tulosrajapinnat eivät palauttaneet rivejä.";
+            statusEl.innerText = "Urheilija löytyi, mutta resultlist ei palauttanut tulosrivejä.";
         }
     } catch (err) {
         statusEl.style.color = "#ef4444";
