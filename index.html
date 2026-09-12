@@ -32,6 +32,358 @@
         th { background-color: #f8fafc; color: #475569; font-weight: 600; }
         .ampuja-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
         .badge-id { background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 6px; }
+        #statusText { font-size: 0.85rem; color: #10b981; margin-top: 10px; font-weight: 600; text-align: center; white-space: pre-wrap; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🎯 KITI Tulosvertailu</h1>
+        <p>Etsi ja vertaile ampujien tuloskehitystä lennosta</p>
+    </header>
+
+    <div class="grid">
+        <!-- Vasen sarake -->
+        <div>
+            <div class="card">
+                <h2>Seurattavat Ampujat</h2>
+                
+                <label for="uusiNimi">Urheilijan Nimi:</label>
+                <input type="text" id="uusiNimi" placeholder="Esim. Emma Virtanen">
+
+                <label for="uusiId">Sportti-ID (varmistaa tulokset):</label>
+                <input type="text" id="uusiId" placeholder="Esim. 60332562">
+
+                <button onclick="lisaaAmpuja()">+ Lisää Ampuja</button>
+                
+                <h3 style="font-size: 0.9rem; margin-top: 20px; color: #475569;">Valitut ampujat:</h3>
+                <div id="ampujatContainer"></div>
+                
+                <label for="hakuMaara">Hakuotanta (kisoja):</label>
+                <select id="hakuMaara">
+                    <option value="10">10 uusinta (Hyvin nopea)</option>
+                    <option value="20" selected>20 uusinta (Tasapainoinen)</option>
+                    <option value="40">40 uusinta (Laaja - Hitaampi)</option>
+                </select>
+
+                <button id="haeBtn" class="btn-success" onclick="haeTiedot()">🔄 Hae Tulokset KITI:stä</button>
+                <div id="statusText"></div>
+            </div>
+
+            <div class="card">
+                <h2>Suodatus</h2>
+                <label for="lajiSelect">Laji:</label>
+                <select id="lajiSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki lajit</option></select>
+            </div>
+        </div>
+
+        <!-- Oikea sarake -->
+        <div>
+            <div class="card">
+                <h2>Tulosvertailu</h2>
+                <div class="stats-grid">
+                    <div class="stat-box"><div class="number" id="statKisaLkm">0</div><div class="label">Osumia KITI:ssä</div></div>
+                    <div class="stat-box"><div class="number" id="statParas">-</div><div class="label">Korkein Tulos</div></div>
+                    <div class="stat-box"><div class="number" id="statKeskiarvo">-</div><div class="label">Keskiarvo</div></div>
+                </div>
+                <canvas id="tulosKaavio" height="130"></canvas>
+            </div>
+
+            <div class="card">
+                <h2>Tuloshistoria</h2>
+                <table>
+                    <thead><tr><th>Pvm</th><th>Kilpailu</th><th>Ampuja</th><th>Laji</th><th>Tulos</th></tr></thead>
+                    <tbody id="tulosTaulukko"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
+let ampujatData = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
+let myChart = null;
+
+function alustaSovellus() {
+    paivitaAmpujatLista();
+    paivitaValikot();
+    paivitaNakyma();
+}
+
+function paivitaAmpujatLista() {
+    const container = document.getElementById("ampujatContainer");
+    if(ampujatData.length === 0) {
+        container.innerHTML = '<p style="font-size:0.85rem; color:#94a3b8;">Ei seurattavia urheilijoita.</p>';
+    } else {
+        container.innerHTML = ampujatData.map((a, i) => `
+            <div class="ampuja-item">
+                <span><b>${a.nimi}</b> ${a.id ? '<span class="badge-id">ID: ' + a.id + '</span>' : ''}</span>
+                <button class="btn-danger" onclick="poistaAmpuja(${i})">X</button>
+            </div>
+        `).join("");
+    }
+    localStorage.setItem("kiti_ampujat", JSON.stringify(ampujatData));
+}
+
+function lisaaAmpuja() {
+    const nimi = document.getElementById("uusiNimi").value.trim();
+    const id = document.getElementById("uusiId").value.trim();
+    if (!nimi) return alert("Ampujan nimi on pakollinen.");
+
+    ampujatData.push({ nimi: nimi, id: String(id) });
+    document.getElementById("uusiNimi").value = "";
+    document.getElementById("uusiId").value = "";
+    paivitaAmpujatLista();
+}
+
+function poistaAmpuja(index) {
+    ampujatData.splice(index, 1);
+    paivitaAmpujatLista();
+}
+
+// UUSI ÄLYKÄS PROXY-REITITIN: Kiertää 3 eri proxy-palvelinta estojen välttämiseksi
+async function fetchKiti(url) {
+    const encodedUrl = encodeURIComponent(url);
+    const proxyList = [
+        `https://api.codetabs.com/v1/proxy?quest=${url}`, // Ensisijainen (paras)
+        `https://api.allorigins.win/raw?url=${encodedUrl}`, // Toissijainen
+        `https://corsproxy.io/?${encodedUrl}` // Varakopion varakopio
+    ];
+
+    for (let proxy of proxyList) {
+        try {
+            const response = await fetch(proxy);
+            if (response.ok) {
+                const data = await response.json();
+                if (data) return data;
+            }
+        } catch (e) {
+            console.log("Reitti estetty, kokeillaan seuraavaa proxyä...");
+        }
+    }
+    throw new Error("Kaikki varayhteydet on estetty.");
+}
+
+function etsiSyvalta(data, oletusLaji = "Ampumaurheilu") {
+    let results = [];
+    if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+        let laji = data.eventName || data.categoryName || data.seriesName || data.sportName || oletusLaji;
+        let onAmpuja = data.firstName || data.lastName || data.athleteName || data.personId || data.sportId;
+        let onTulos = data.score !== undefined || data.totalScore !== undefined || data.result !== undefined;
+
+        if (onAmpuja && onTulos) {
+            data._loytyi_laji = laji;
+            results.push(data);
+        }
+        for (let key in data) {
+            if (typeof data[key] === 'object') {
+                results = results.concat(etsiSyvalta(data[key], laji));
+            }
+        }
+    } else if (Array.isArray(data)) {
+        for (let item of data) {
+            results = results.concat(etsiSyvalta(item, oletusLaji));
+        }
+    }
+    return results;
+}
+
+async function haeTiedot() {
+    if (ampujatData.length === 0) return alert("Lisää ensin vähintään yksi ampuja listalle.");
+    
+    const haeBtn = document.getElementById("haeBtn");
+    const statusEl = document.getElementById("statusText");
+    const maxKisa = parseInt(document.getElementById("hakuMaara").value);
+    
+    haeBtn.disabled = true;
+    statusEl.style.color = "#3b82f6";
+    statusEl.innerText = "Avataan yhteys kilpailukalenteriin...";
+    let uudetTulokset = [];
+
+    try {
+        const comps = await fetchKiti("https://kiti.ampumaurheiluliitto.fi/api/competitions");
+        let kisaLista = Array.isArray(comps) ? comps : (comps.content || comps.competitions || []);
+        kisaLista = kisaLista.slice(0, maxKisa);
+
+        for (let i = 0; i < kisaLista.length; i++) {
+            let comp = kisaLista[i];
+            if (!comp.id) continue;
+            
+            // Näytetään edistyminen selkeästi
+            statusEl.innerText = `Haetaan kilpailun tuloksia:\n[${i+1} / ${kisaLista.length}]`;
+            
+            try {
+                const tulosDataRaw = await fetchKiti(`https://kiti.ampumaurheiluliitto.fi/api/competitions/${comp.id}/results`);
+                const kaikkiRivit = etsiSyvalta(tulosDataRaw);
+
+                for (let rivi of kaikkiRivit) {
+                    const rowId = String(rivi.licenseNumber || rivi.sportId || rivi.personId || rivi.athleteId || "").trim();
+                    const rowName = String(rivi.athleteName || `${rivi.lastName || ''} ${rivi.firstName || ''}`).trim().toLowerCase();
+
+                    const kohdeAmpuja = ampujatData.find(a => {
+                        const matchId = a.id && rowId === String(a.id);
+                        const matchName = a.nimi && rowName.includes(a.nimi.toLowerCase());
+                        return matchId || matchName;
+                    });
+
+                    if (kohdeAmpuja) {
+                        const tRaw = rivi.score || rivi.totalScore || rivi.result || rivi.total || 0;
+                        const tVal = parseFloat(String(tRaw).replace(",", "."));
+                        if (tVal > 0) {
+                            uudetTulokset.push({
+                                pvm: (comp.startDate || comp.date || "2026-01-01").substring(0, 10),
+                                kilpailu: comp.name || comp.title || "Kilpailu",
+                                ampuja: kohdeAmpuja.nimi,
+                                laji: rivi._loytyi_laji,
+                                tulos: tVal
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log(`Ohitettiin kisa virheen vuoksi`);
+            }
+
+            // TAUKO KASVATETTU: Estää robottisuojien laukeamisen
+            await new Promise(resolve => setTimeout(resolve, 1200));
+        }
+
+        // Poistetaan duplikaatit
+        const uniikit = [];
+        const seen = new Set();
+        uudetTulokset.forEach(r => {
+            const uid = `${r.pvm}_${r.ampuja}_${r.laji}_${r.tulos}`;
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                uniikit.push(r);
+            }
+        });
+
+        if (uniikit.length > 0) {
+            tulosData = uniikit;
+            localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
+            statusEl.style.color = "#10b981";
+            statusEl.innerText = `Haku valmis! Löytyi ${uniikit.length} uutta/päivitettyä tulosta.`;
+            paivitaValikot();
+            paivitaNakyma();
+        } else {
+            statusEl.style.color = "#f59e0b"; // Oranssi
+            statusEl.innerText = "Haku valmis, mutta KITI:stä ei löytynyt tuloksia valitulla aikavälillä/urheilijoilla.";
+        }
+    } catch (err) {
+        statusEl.style.color = "#ef4444";
+        statusEl.innerText = "KITI:n palomuuri esti väliaikaisesti haut selainliikenteeltä. Yritä 5-10 minuutin kuluttua uudelleen.";
+    }
+
+    haeBtn.disabled = false;
+}
+
+function paivitaValikot() {
+    const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
+    document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
+}
+
+function paivitaNakyma() {
+    const valittuLaji = document.getElementById("lajiSelect").value;
+    const data = tulosData.filter(d => valittuLaji === "Kaikki" || d.laji === valittuLaji);
+
+    document.getElementById("statKisaLkm").innerText = data.length;
+    if (data.length > 0) {
+        const tulokset = data.map(d => d.tulos);
+        document.getElementById("statParas").innerText = Math.max(...tulokset);
+        document.getElementById("statKeskiarvo").innerText = (tulokset.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
+    } else {
+        document.getElementById("statParas").innerText = "-";
+        document.getElementById("statKeskiarvo").innerText = "-";
+    }
+
+    const tbody = document.getElementById("tulosTaulukko");
+    tbody.innerHTML = data.sort((a,b) => new Date(b.pvm) - new Date(a.pvm)).map(d => `
+        <tr>
+            <td>${d.pvm}</td>
+            <td style="font-size: 0.8rem; color: #64748b;">${d.kilpailu}</td>
+            <td><b>${d.ampuja}</b></td>
+            <td>${d.laji}</td>
+            <td><b>${d.tulos}</b></td>
+        </tr>
+    `).join("");
+
+    piirraKaavio(data);
+}
+
+function piirraKaavio(data) {
+    const ctx = document.getElementById('tulosKaavio').getContext('2d');
+    const sorted = [...data].sort((a, b) => new Date(a.pvm) - new Date(b.pvm));
+
+    if (myChart) { myChart.destroy(); }
+
+    const ampujat = [...new Set(sorted.map(d => d.ampuja))];
+    const variPaletti = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+    const datasets = ampujat.map((amp, idx) => {
+        const ampujaData = sorted.filter(d => d.ampuja === amp);
+        return {
+            label: amp,
+            data: ampujaData.map(d => ({ x: d.pvm, y: d.tulos })),
+            borderColor: variPaletti[idx % variPaletti.length],
+            borderWidth: 2,
+            tension: 0.1,
+            fill: false,
+            pointBackgroundColor: variPaletti[idx % variPaletti.length],
+            pointRadius: 4
+        };
+    });
+
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: datasets },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: true, position: 'top' } },
+            scales: { x: { type: 'category' } }
+        }
+    });
+}
+
+window.onload = alustaSovellus;
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KITI Tulosvertailu</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #0f172a; --primary-light: #3b82f6; --bg: #f8fafc; --card-bg: #ffffff; --text: #1e293b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { background-color: var(--primary); color: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; }
+        header h1 { margin: 0; font-size: 1.8rem; }
+        header p { margin: 6px 0 0 0; opacity: 0.85; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: 340px 1fr; } }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { font-size: 1.1rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;}
+        label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.85rem; color: #475569; }
+        select, input { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; background-color: var(--primary-light); color: white; font-weight: 600; border: none; padding: 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        .btn-success { background-color: #10b981; }
+        .btn-danger { background-color: #ef4444; margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-box { background: #f1f5f9; padding: 16px; border-radius: 8px; text-align: center; }
+        .stat-box .number { font-size: 1.6rem; font-weight: bold; color: var(--primary-light); }
+        .stat-box .label { font-size: 0.75rem; color: #64748b; margin-top: 4px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        .ampuja-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        .badge-id { background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 6px; }
         #statusText { font-size: 0.85rem; color: #10b981; margin-top: 10px; font-weight: 600; text-align: center; }
     </style>
 </head>
