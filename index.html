@@ -217,33 +217,17 @@
 let tulosData = [];
 let myChart = null;
 
-// Reaaliaikainen KITI-data / varadata web-ympäristöön
-async function lataaKitiData(manual = false) {
+async function lataaData() {
     try {
-        // Yritetään hakea KITI-rajapinnasta tai verkon yli
-        const response = await fetch('https://kiti.ampumaurheiluliitto.fi/api/competitions', { mode: 'cors' });
-        if (response.ok) {
-            const comps = await response.json();
-            // Käsitellään KITI-data KhjA:n osalta
-            tulosData = processKitiData(comps);
-        } else {
-            throw new Error("Suora KITI-rajapinta ei salli CORS-pyyntöä selaimesta");
-        }
+        // Luetaan GitHub-automaation luoma data.json
+        const response = await fetch('data.json?v=' + new Date().getTime());
+        if (!response.ok) throw new Error("Dataa ei saatavilla");
+        tulosData = await response.json();
     } catch (e) {
-        console.log("Käytetään pilviasennuksen synkronoitua dataa:", e.message);
-        // Demonstroidaan valmista verkkoalustaa varten rakennettua KhjA-dataa
-        tulosData = [
-            { pvm: "2026-01-18", ampuja: "Hautala Ville", laji: "Ilmakivääri 10m", tulos: 614.2 },
-            { pvm: "2026-02-01", ampuja: "Hautala Ville", laji: "Ilmakivääri 10m", tulos: 616.8 },
-            { pvm: "2026-02-22", ampuja: "Hautala Ville", laji: "Ilmakivääri 10m", tulos: 618.5 },
-            { pvm: "2026-01-25", ampuja: "Pitkäranta Jyrki", laji: "Ilmapistooli 10m", tulos: 568.0 },
-            { pvm: "2026-02-15", ampuja: "Pitkäranta Jyrki", laji: "Ilmapistooli 10m", tulos: 572.0 },
-            { pvm: "2026-02-08", ampuja: "Laine Juha", laji: "Trap 125", tulos: 112.0 },
-            { pvm: "2026-03-01", ampuja: "Laine Juha", laji: "Trap 125", tulos: 116.0 }
-        ];
+        console.log("Odotetaan ensimmäistä automaattiajoa...");
+        tulosData = [];
     }
     alustaSovellus();
-    if(manual) alert("KITI-data päivitetty!");
 }
 
 function alustaSovellus() {
@@ -279,7 +263,7 @@ function paivitaNakyma() {
         document.getElementById("statParas").innerText = Math.max(...tulokset);
         document.getElementById("statKeskiarvo").innerText = (tulokset.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
     } else {
-        document.getElementById("statParas").innerText = "-";
+        document.getElementById("statParas").innerText = "0";
         document.getElementById("statKeskiarvo").innerText = "-";
     }
 
@@ -324,7 +308,7 @@ function piirraKaavio(data) {
     });
 }
 
-window.onload = () => lataaKitiData(false);
+window.onload = lataaData;
 </script>
 </body>
 </html>
