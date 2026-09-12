@@ -40,7 +40,7 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Suora urheilijakohtainen haku</p>
+        <p>Suora urheilijakohtainen tuloshaku</p>
     </header>
 
     <div class="grid">
@@ -156,30 +156,6 @@ async function fetchKiti(url) {
     throw new Error("Yhteys estetty.");
 }
 
-// Apufunktio, joka kaivaa tulokset esiin mistä tahansa vastauksen rakenteesta
-function etsiSyvalta(data, oletusLaji = "Ampumaurheilu") {
-    let results = [];
-    if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-        let laji = data.eventName || data.categoryName || data.seriesName || data.sportName || oletusLaji;
-        let onTulos = data.score !== undefined || data.totalScore !== undefined || data.result !== undefined;
-
-        if (onTulos) {
-            data._loytyi_laji = laji;
-            results.push(data);
-        }
-        for (let key in data) {
-            if (typeof data[key] === 'object') {
-                results = results.concat(etsiSyvalta(data[key], laji));
-            }
-        }
-    } else if (Array.isArray(data)) {
-        for (let item of data) {
-            results = results.concat(etsiSyvalta(item, oletusLaji));
-        }
-    }
-    return results;
-}
-
 async function haeTiedot() {
     if (ampujatData.length === 0) return alert("Lisää ensin vähintään yksi ampuja listalle.");
     
@@ -193,52 +169,44 @@ async function haeTiedot() {
 
     try {
         for (let ampuja of ampujatData) {
-            statusEl.innerText = `Haetaan: ${ampuja.nimi} (ID: ${ampuja.id})...`;
+            statusEl.innerText = `Haetaan ID:llä ${ampuja.id} (${ampuja.nimi})...`;
             
-            // 1. Haetaan urheilijan perustiedot / id-osumat suoraan löytämästäsi osoitteesta
-            const athleteSearchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${ampuja.id}&limit=10&page=1`;
+            // 1. Haetaan henkilön sisäinen KITI ID löytämäsi haun kautta
+            const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${ampuja.id}&limit=5&page=1`;
             
             try {
-                const searchRes = await fetchKiti(athleteSearchUrl);
+                const searchRes = await fetchKiti(searchUrl);
                 const athletes = Array.isArray(searchRes) ? searchRes : (searchRes.content || searchRes.athletes || searchRes.data || []);
                 
-                // Käydään läpi löydetyt henkilöt ja kokeillaan hakea heidän tuloksensa
                 for (let ath of athletes) {
-                    const athId = ath.id || ath.personId;
-                    if (!athId) continue;
+                    const internalId = ath.id; // Kuvan perusteella henkilön sisäinen ID on suoraan ath.id (esim 5648)
+                    if (!internalId) continue;
 
-                    // Kokeillaan yleisimpiä urheilijan tulososoitteita
-                    const possibleResultsUrls = [
-                        `https://kiti.ampumaurheiluliitto.fi/api/athletes/${athId}/results`,
-                        `https://kiti.ampumaurheiluliitto.fi/api/persons/${athId}/results`,
-                        `https://kiti.ampumaurheiluliitto.fi/api/competitions/athlete/${athId}`
-                    ];
-
-                    for (let resUrl of possibleResultsUrls) {
-                        try {
-                            const resData = await fetchKiti(resUrl);
-                            const rivit = etsiSyvalta(resData);
-                            
-                            for (let rivi of rivit) {
-                                const tRaw = rivi.score || rivi.totalScore || rivi.result || rivi.total || 0;
-                                const tVal = parseFloat(String(tRaw).replace(",", "."));
-                                if (tVal > 0) {
-                                    uudetTulokset.push({
-                                        pvm: (rivi.startDate || rivi.date || rivi.competitionDate || "2026-01-01").substring(0, 10),
-                                        kilpailu: rivi.competitionName || rivi.name || "Kilpailu",
-                                        ampuja: ampuja.nimi,
-                                        laji: rivi._loytyi_laji,
-                                        tulos: tVal
-                                    });
-                                }
-                            }
-                        } catch (err) {}
+                    // 2. Haetaan tulokset suoraan oikeasta /api/resultlist/ -osoitteesta
+                    const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete&ordering=competition_start_date&athlete=${internalId}`;
+                    const resData = await fetchKiti(resultsUrl);
+                    
+                    const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
+                    
+                    for (let row of rows) {
+                        const tRaw = row.score || row.totalScore || row.result || row.total || 0;
+                        const tVal = parseFloat(String(tRaw).replace(",", "."));
+                        
+                        if (tVal > 0) {
+                            uudetTulokset.push({
+                                pvm: (row.competitionStartDate || row.startDate || row.date || "2026-01-01").substring(0, 10),
+                                kilpailu: row.competitionName || row.name || "Kilpailu",
+                                ampuja: ampuja.nimi,
+                                laji: row.eventName || row.sport || row.sportName || "Ampumaurheilu",
+                                tulos: tVal
+                            });
+                        }
                     }
                 }
             } catch (e) {
-                console.log("Haku epäonnistui tälle ampujalle");
+                console.log("Virhe haussa", e);
             }
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 400));
         }
 
         // Poistetaan duplikaatit
@@ -261,7 +229,7 @@ async function haeTiedot() {
             paivitaNakyma();
         } else {
             statusEl.style.color = "#f59e0b";
-            statusEl.innerText = "Urheilija löytyi, mutta tulosrajapinnan osoite vaatii tarkennusta. Tarkista konsoli.";
+            statusEl.innerText = "Urheilija löytyi, mutta tuloslistalta ei löytynyt kirjauksia.";
         }
     } catch (err) {
         statusEl.style.color = "#ef4444";
