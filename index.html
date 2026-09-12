@@ -29,8 +29,6 @@
         select, input { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
         button { width: 100%; background-color: var(--primary-light); color: white; font-weight: 600; border: none; padding: 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; transition: 0.2s; }
         button:hover { opacity: 0.9; }
-        button:disabled { background-color: #94a3b8; cursor: not-allowed; }
-        .btn-success { background-color: var(--success); }
         .btn-danger { background-color: var(--danger); margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
@@ -111,6 +109,14 @@ function alusta() {
     paivitaNakyma();
 }
 
+async function haeKiti(url) {
+    // Käytetään suoraan luotettavaa allorigins-proxyä, joka kiertää selainten CORS-estot ilman erillistä palvelinfunktiota
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error("Verkkopyyntö epäonnistui");
+    return await response.json();
+}
+
 async function lisaaJaHaeAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
@@ -121,12 +127,27 @@ async function lisaaJaHaeAmpuja() {
     statusEl.innerText = `Haetaan tuloksia henkilölle ${nimi}...`;
 
     try {
-        // Kutsutaan omaa Vercel-taustafunktiota
-        const response = await fetch(`/api/kiti?id=${id}`);
-        if (!response.ok) throw new Error("Haku epäonnistui");
+        // 1. Etsitään sisäinen ID Sportti-ID:llä
+        const searchData = await haeKiti(`https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${id}&limit=5&page=1`);
+        const athletes = Array.isArray(searchData) ? searchData : (searchData.content || searchData.athletes || searchData.data || [searchData]);
 
-        const resData = await response.json();
-        const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
+        let internalId = null;
+        for (let ath of athletes) {
+            if (ath.id || ath.personId) {
+                internalId = ath.id || ath.personId;
+                break;
+            }
+        }
+
+        if (!internalId) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Urheilijaa ei löytynyt annetulla Sportti-ID:llä.";
+            return;
+        }
+
+        // 2. Haetaan viralliset tulokset sisäisellä ID:llä
+        const resultsData = await haeKiti(`https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete&ordering=competition_start_date&athlete=${internalId}`);
+        const rows = Array.isArray(resultsData) ? resultsData : (resultsData.content || resultsData.results || resultsData.data || []);
 
         const uudet = rows.map(row => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
@@ -140,13 +161,11 @@ async function lisaaJaHaeAmpuja() {
         }).filter(r => r.tulos > 0);
 
         if (uudet.length > 0) {
-            // Tallennetaan ampuja listaan, jos sitä ei vielä ole
             if (!ampujat.some(a => a.id === id)) {
                 ampujat.push({ nimi, id });
                 localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
             }
 
-            // Yhdistetään vanhoihin tuloksiin ja poistetaan duplikaatit
             tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
@@ -164,7 +183,7 @@ async function lisaaJaHaeAmpuja() {
         }
     } catch (e) {
         statusEl.style.color = "var(--danger)";
-        statusEl.innerText = "Virhe haussa. Tarkista Sportti-ID.";
+        statusEl.innerText = "Virhe haussa. Tarkista Sportti-ID tai verkkoyhteys.";
     }
 }
 
@@ -173,7 +192,6 @@ function poistaAmpuja(index) {
     ampujat.splice(index, 1);
     localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
     
-    // Poistetaan myös kyseisen ampujan tulokset
     tulosData = tulosData.filter(d => d.ampuja !== poistettava.nimi);
     localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
