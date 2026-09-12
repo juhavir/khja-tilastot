@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/kiti.js": {
+      "maxDuration": 10
+    }
+  }
+}
