@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KhjA - Kauhajoen Ampujat | KITI Tilastoportaali</title>
+    <title>KhjA - Kauhajoen Ampujat | KITI Tilastot</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #1e3a8a;
             --primary-light: #2563eb;
-            --accent: #d97706;
             --bg: #f8fafc;
             --card-bg: #ffffff;
             --text: #0f172a;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
@@ -26,34 +25,16 @@
         .container { max-width: 1100px; margin: 0 auto; }
 
         header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            background-color: var(--primary);
             color: white;
-            padding: 28px;
-            border-radius: 14px;
+            padding: 24px;
+            border-radius: 12px;
             margin-bottom: 24px;
-            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
 
-        header h1 { margin: 0; font-size: 1.9rem; font-weight: 700; }
-        header p { margin: 6px 0 0 0; opacity: 0.85; font-size: 0.95rem; }
-
-        .status-badge {
-            background-color: rgba(255, 255, 255, 0.15);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .dot { width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; }
+        header h1 { margin: 0; font-size: 1.8rem; }
+        header p { margin: 6px 0 0 0; opacity: 0.85; }
 
         .grid {
             display: grid;
@@ -62,29 +43,28 @@
         }
 
         @media (min-width: 768px) {
-            .grid { grid-template-columns: 290px 1fr; }
+            .grid { grid-template-columns: 320px 1fr; }
         }
 
         .card {
             background: var(--card-bg);
-            padding: 22px;
+            padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             margin-bottom: 20px;
         }
 
-        h2 { font-size: 1.15rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;}
+        h2 { font-size: 1.1rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;}
 
-        label { display: block; margin-top: 14px; font-weight: 600; font-size: 0.85rem; color: #475569; }
+        label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.85rem; color: #475569; }
         select, input {
             width: 100%;
-            padding: 10px;
-            margin-top: 5px;
+            padding: 9px;
+            margin-top: 4px;
             border: 1px solid #cbd5e1;
-            border-radius: 8px;
+            border-radius: 6px;
             background-color: #fff;
             box-sizing: border-box;
-            font-size: 0.9rem;
         }
 
         button {
@@ -93,32 +73,33 @@
             color: white;
             font-weight: 600;
             border: none;
-            padding: 11px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-top: 16px;
-            transition: background 0.2s;
+            margin-top: 10px;
         }
 
         button:hover { background-color: var(--primary); }
+
+        .btn-danger { background-color: #ef4444; margin-top: 0; padding: 4px 8px; font-size: 0.75rem; width: auto; }
+        .btn-danger:hover { background-color: #dc2626; }
 
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 12px;
-            margin-bottom: 22px;
+            margin-bottom: 20px;
         }
 
         .stat-box {
             background: #eff6ff;
-            padding: 16px;
-            border-radius: 10px;
+            padding: 14px;
+            border-radius: 8px;
             text-align: center;
-            border: 1px solid #dbeafe;
         }
 
-        .stat-box .number { font-size: 1.7rem; font-weight: 700; color: var(--primary); }
-        .stat-box .label { font-size: 0.75rem; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .stat-box .number { font-size: 1.6rem; font-weight: bold; color: var(--primary); }
+        .stat-box .label { font-size: 0.75rem; color: #64748b; margin-top: 2px; text-transform: uppercase; }
 
         table {
             width: 100%;
@@ -127,29 +108,32 @@
             font-size: 0.9rem;
         }
 
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-        tr:hover { background-color: #f1f5f9; }
+
+        .ampuja-lista-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <div>
-            <h1>🎯 Kauhajoen Ampujat (KhjA)</h1>
-            <p>Sähköinen KITI-tilastoportaali ja tulosseuranta</p>
-        </div>
-        <div class="status-badge">
-            <span class="dot"></span> Verkkoversio katseltavissa
-        </div>
+        <h1>🎯 Kauhajoen Ampujat (KhjA)</h1>
+        <p>Virallinen KITI-tilastoportaali ja tulosseuranta</p>
     </header>
 
     <div class="grid">
-        <!-- Vasen sarake: Valikot -->
+        <!-- Vasen sarake -->
         <div>
             <div class="card">
-                <h2>Suodata Datalähdettä</h2>
+                <h2>Suodata Tuloksia</h2>
                 
                 <label for="lajiSelect">Laji:</label>
                 <select id="lajiSelect" onchange="paivitaNakyma()">
@@ -160,17 +144,27 @@
                 <select id="ampujaSelect" onchange="paivitaNakyma()">
                     <option value="Kaikki">Kaikki ampujat</option>
                 </select>
-
-                <button onclick="lataaKitiData(true)">🔄 Päivitä KITI Data</button>
             </div>
 
-            <div class="card" style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
-                <h2 style="font-size: 0.95rem;">Info & Ohje</h2>
-                Tämä selainversio hakee ja analysoi Kauhajoen Ampujien tuloksia suoraan Suomen Ampumaurheiluliiton KITI-järjestelmästä. Toimii millä tahansa laitteella ilman asennusta.
+            <!-- UUSI: Ampujien lisäys suoraan sivustolla -->
+            <div class="card">
+                <h2>Lisää KhjA Ampuja</h2>
+                <label for="uusiNimi">Ampujan Nimi:</label>
+                <input type="text" id="uusiNimi" placeholder="Esim. Matti Meikäläinen">
+
+                <label for="uusiId">Sportti-ID (Valinnainen):</label>
+                <input type="text" id="uusiId" placeholder="Esim. 12345678">
+
+                <button onclick="lisaaAmpuja()">+ Lisää Ampuja Listalle</button>
+
+                <h3 style="font-size: 0.9rem; margin-top: 15px; color: #475569;">Tällä hetkellä seurattavat:</h3>
+                <div id="ampujatContainer"></div>
+
+                <button onclick="kopioiJson()" style="background-color: #059669; margin-top: 15px;">📋 Kopioi lista GitHubiin</button>
             </div>
         </div>
 
-        <!-- Oikea sarake: Graafit ja taulukot -->
+        <!-- Oikea sarake -->
         <div>
             <div class="card">
                 <h2>Tuloskehitys & Tilastot</h2>
@@ -204,9 +198,7 @@
                             <th>Tulos</th>
                         </tr>
                     </thead>
-                    <tbody id="tulosTaulukko">
-                        <!-- Täytetään dynaamisesti -->
-                    </tbody>
+                    <tbody id="tulosTaulukko"></tbody>
                 </table>
             </div>
         </div>
@@ -215,33 +207,65 @@
 
 <script>
 let tulosData = [];
+let ampujatData = JSON.parse(localStorage.getItem("khja_ampujat")) || [
+    { nimi: "Ville Hautala", sportti_id: "" },
+    { nimi: "Jyrki Pitkäranta", sportti_id: "" }
+];
 let myChart = null;
 
 async function lataaData() {
     try {
-        // Luetaan automaation generoima data.json
         const response = await fetch('data.json?v=' + new Date().getTime());
-        if (!response.ok) throw new Error("data.json ei löydy");
-        tulosData = await response.json();
+        if (response.ok) {
+            tulosData = await response.json();
+        }
     } catch (e) {
-        console.log("Dataa ei löytynyt vielä, näytetään tyhjä tila:", e);
-        tulosData = [];
+        console.log("Ei automaattidataa vielä saatavilla.");
     }
     alustaSovellus();
 }
 
 function alustaSovellus() {
     paivitaValikot();
+    paivitaAmpujatLista();
     paivitaNakyma();
 }
 
-function paivitaValikot() {
-    if (!tulosData || tulosData.length === 0) {
-        document.getElementById("lajiSelect").innerHTML = '<option value="Kaikki">Ei dataa (Aja Actions)</option>';
-        document.getElementById("ampujaSelect").innerHTML = '<option value="Kaikki">Ei dataa (Aja Actions)</option>';
-        return;
-    }
+function paivitaAmpujatLista() {
+    const container = document.getElementById("ampujatContainer");
+    container.innerHTML = ampujatData.map((a, index) => `
+        <div class="ampuja-lista-item">
+            <span><b>${a.nimi}</b> ${a.sportti_id ? '(' + a.sportti_id + ')' : ''}</span>
+            <button class="btn-danger" onclick="poistaAmpuja(${index})">X</button>
+        </div>
+    `).join("");
+    localStorage.setItem("khja_ampujat", JSON.stringify(ampujatData));
+}
 
+function lisaaAmpuja() {
+    const nimi = document.getElementById("uusiNimi").value.trim();
+    const id = document.getElementById("uusiId").value.trim();
+
+    if (!nimi) { alert("Syötä vähintään ampujan nimi!"); return; }
+
+    ampujatData.push({ nimi: nimi, sportti_id: id });
+    document.getElementById("uusiNimi").value = "";
+    document.getElementById("uusiId").value = "";
+    paivitaAmpujatLista();
+}
+
+function poistaAmpuja(index) {
+    ampujatData.splice(index, 1);
+    paivitaAmpujatLista();
+}
+
+function kopioiJson() {
+    const jsonStr = JSON.stringify(ampujatData, null, 2);
+    navigator.clipboard.writeText(jsonStr);
+    alert("Ampujalisa kopioitu leikepöydälle! Voit liittää sen GitHubiin 'ampujat.json'-tiedostoon.");
+}
+
+function paivitaValikot() {
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
     const ampujat = ["Kaikki", ...new Set(tulosData.map(d => d.ampuja))];
 
