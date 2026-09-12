@@ -1,0 +1,38 @@
+name: Päivitä KITI-tulokset
+
+on:
+  workflow_dispatch: # Voit ajaa haun koska tahansa napista GitHubissa
+  schedule:
+    - cron: '0 6 * * *' # Päivittää automaattisesti kerran päivässä klo 06:00
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hae koodi
+        uses: actions/checkout@v4
+
+      - name: Suorita datan haku
+        run: |
+          # 1. Etsitään sisäinen ID Sportti-ID:llä
+          SPORTTI_ID="60332562"
+          SEARCH_RES=$(curl -s "https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=$SPORTTI_ID&limit=5&page=1")
+          INTERNAL_ID=$(echo "$SEARCH_RES" | grep -o '"id":[0-9]*' | head -n 1 | cut -d':' -f2)
+          
+          echo "Löytyi sisäinen ID: $INTERNAL_ID"
+
+          if [ -n "$INTERNAL_ID" ]; then
+            # 2. Haetaan tuloslista ja tallennetaan se tiedostoon data.json
+            curl -s "https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete&ordering=competition_start_date&athlete=$INTERNAL_ID" > data.json
+          else
+            echo "Urheilijaa ei löytynyt!"
+            echo "[]" > data.json
+          fi
+
+      - name: Tallenna muutokset GitHubiin
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git commit -m "Päivitetty KITI-tulokset automaattisesti" || echo "Ei muutoksia"
+          git push
