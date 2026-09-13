@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v48.0</title>
+    <title>KITI Tulosvertailu v50.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -277,7 +277,6 @@
                                 <th>Laji</th>
                                 <th>Sarja</th>
                                 <th>Tulos</th>
-                                <th>Sijoitus</th>
                             </tr>
                         </thead>
                         <tbody id="tulosTaulukko"></tbody>
@@ -289,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v48.0_API_POSITION";
+const KITI_VERSIO = "v50.0_ALLTIME_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -298,6 +297,7 @@ if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
 let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
+let kitiParasSijoitusCache = {};
 
 const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 
@@ -306,6 +306,69 @@ function alusta() {
     paivitaAmpujatLista();
     paivitaValikot(true);
     paivitaNakyma();
+}
+
+// Hakee KITI:n /api/resultlist/-rajapinnasta kaikkien aikojen listan, poimii ampujien parhaat tulokset ja laskee sijoituksen
+async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoodi) {
+    if (!sportId || !sarjaKoodi || sarjaKoodi === "Kaikki") return "-";
+
+    const cacheKey = `${ampujaNimi.toLowerCase().trim()}_${sportId}_${sarjaKoodi}`;
+    if (kitiParasSijoitusCache[cacheKey] !== undefined) {
+        return kitiParasSijoitusCache[cacheKey];
+    }
+
+    try {
+        // Haetaan tarpeeksi suuri määrä tuloksia (limit=300), että saadaan kattava otos sarjan tuloslistasta
+        const url = `/api/resultlist/?sport=${sportId}&category=${encodeURIComponent(sarjaKoodi)}&limit=300&nocache=${Date.now()}`;
+        const response = await fetch(url);
+        if (!response.ok) return "-";
+
+        const data = await response.json();
+        const rows = data.results || data.content || data.data || [];
+        if (rows.length === 0) return "-";
+
+        // 1. Kerätään jokaiselta ampujalta hänen PARAS tuloksensa tässä sarjassa
+        const parhaatPerAmpuja = {};
+        rows.forEach(r => {
+            let nimi = "";
+            if (r.athlete && typeof r.athlete === 'object') {
+                nimi = `${r.athlete.first_name || ''} ${r.athlete.last_name || ''}`.trim();
+            } else {
+                nimi = `${r.first_name || ''} ${r.last_name || ''}`.trim();
+            }
+            nimi = nimi.toLowerCase();
+
+            const tRaw = r.result !== undefined ? r.result : (r.score !== undefined ? r.score : 0);
+            const tulos = parseFloat(String(tRaw).replace(",", ".")) || 0;
+
+            if (nimi && tulos > 0) {
+                if (!parhaatPerAmpuja[nimi] || tulos > parhaatPerAmpuja[nimi]) {
+                    parhaatPerAmpuja[nimi] = tulos;
+                }
+            }
+        });
+
+        // 2. Muutetaan listaksi ja järjestetään parhaan tuloksen mukaan laskevasti (suurin tulos = 1. sija)
+        const rankingLista = Object.entries(parhaatPerAmpuja)
+            .map(([nimi, tulos]) => ({ nimi, tulos }))
+            .sort((a, b) => b.tulos - a.tulos);
+
+        // 3. Etsitään ampujan sijoitus tältä kaikkien aikojen parhaiden listalta
+        const etsittavaNimi = ampujaNimi.trim().toLowerCase();
+        const sijaIndeksi = rankingLista.findIndex(r => r.nimi === etsittavaNimi);
+
+        let tulosSijoitus = "-";
+        if (sijaIndeksi !== -1) {
+            tulosSijoitus = `${sijaIndeksi + 1}.`;
+        }
+
+        kitiParasSijoitusCache[cacheKey] = tulosSijoitus;
+        return tulosSijoitus;
+    } catch (e) {
+        console.error("Virhe KITI-sijoitushaussa:", e);
+    }
+
+    return "-";
 }
 
 function etsiKilpailunNimi(row) {
@@ -412,8 +475,7 @@ async function lisaaJaHaeAmpuja() {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", "."));
             
-            // Otetaan suoraan KITI API:n palauttama kisan aikainen sijoitus (position)
-            const sijoitus = row.position !== undefined && row.position !== null ? `${row.position}.` : "-";
+            const sportId = row.sport_id || row.sportId || (row.sport && row.sport.id) || (row.competition && row.competition.type_info && row.competition.type_info.sport) || "1";
 
             return {
                 pvm: tunnistaKisanPaivamaara(row),
@@ -422,7 +484,7 @@ async function lisaaJaHaeAmpuja() {
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
                 tulos: tulos,
-                sijoitus: sijoitus
+                sportId: String(sportId)
             };
         }).filter(r => r.tulos > 0);
 
@@ -438,6 +500,7 @@ async function lisaaJaHaeAmpuja() {
             tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
+            kitiParasSijoitusCache = {};
             statusEl.innerText = `Löytyi ${uudet.length} tulosta!`;
             
             document.getElementById("uusiNimi").value = "";
@@ -467,6 +530,7 @@ function poistaAmpuja(index) {
     tulosData = tulosData.filter(d => d.ampuja !== poistettava.nimi);
     localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
+    kitiParasSijoitusCache = {};
     paivitaAmpujatLista();
     paivitaValikot(false);
     paivitaNakyma();
@@ -626,14 +690,11 @@ function paivitaNakyma() {
             const hajonta = laskeHajonta(aTuloksetRajatut);
             const vari = variPaletti[idx % variPaletti.length];
 
-            // Näytetään tilastolaatikossa viimeisimmän näytössä olevan kisan sijoitus tai yhteenveto
-            const viimeisinSijoitus = aRivitRajattu.length > 0 ? (aRivitRajattu[0].sijoitus || "-") : "-";
-
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat" title="Viimeisimmän kilpailun sijoitus (KITI API)"><span class="val" style="color:var(--success); font-size:0.95rem;">${viimeisinSijoitus}</span><span class="lbl">Kisasijoitus</span></div>
+                        <div class="sub-stat" title="Paras sijoitus valtakunnallisella kaikkien aikojen tilastolistalla (laji & sarja)"><span class="val" id="sij_el_${ampObj.id}_${idx}" style="color:var(--success); font-size:0.95rem;">...</span><span class="lbl">Sijoitus</span></div>
                         <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
                         <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
@@ -649,6 +710,23 @@ function paivitaNakyma() {
                 </div>
             `;
         }).join("");
+
+        // Haetaan dynaamisesti oikea kaikkien aikojen paras sijoitus KITI API:sta valitulle lajille ja sarjalle
+        aktiivisetAmpujat.forEach(async (ampObj, idx) => {
+            const elem = document.getElementById(`sij_el_${ampObj.id}_${idx}`);
+            if (!elem) return;
+
+            if (valittuLaji === "Kaikki" || valittuSarja === "Kaikki") {
+                elem.innerText = "Valitse laji & sarja";
+                return;
+            }
+
+            const ampRivit = tulosData.filter(d => d.ampuja === ampObj.nimi && d.laji === valittuLaji && d.sarja === valittuSarja);
+            let sportId = ampRivit.length > 0 ? ampRivit[0].sportId : "1";
+
+            const parasSijoitus = await haeKitiKaikkienAikojenParasSijoitus(ampObj.nimi, sportId, valittuSarja);
+            elem.innerText = parasSijoitus;
+        });
 
     } else {
         statsContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:8px;">Ei aktiivisia ampujia valittuna.</div>';
@@ -674,7 +752,6 @@ function paivitaNakyma() {
             <td><span class="tag tag-laji">${d.laji}</span></td>
             <td><span class="tag">${d.sarja}</span></td>
             <td><b>${d.tulos}</b></td>
-            <td><span class="tag" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3);">${d.sijoitus || "-"}</span></td>
         </tr>
     `).join("");
 
