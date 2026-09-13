@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu</title>
+    <title>KITI Tulosvertailu v8.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -15,6 +15,7 @@
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --danger: #f87171;
+            --warning: #fbbf24;
             --input-bg: #0b132a;
         }
 
@@ -94,6 +95,7 @@
         }
 
         button:hover { background-color: var(--primary-hover); color: white; }
+        button:disabled { background-color: var(--card-border); color: var(--text-muted); cursor: not-allowed; }
 
         .btn-danger { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); margin: 0; padding: 2px 6px; font-size: 0.7rem; width: auto; }
         .btn-danger:hover { background-color: var(--danger); color: white; }
@@ -135,6 +137,16 @@
         #statusText { font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; word-break: break-word; }
         .tag { background: #26354a; color: var(--text-main); padding: 2px 5px; font-size: 0.7rem; font-weight: 600; display: inline-block; }
         .tag-laji { background: rgba(56, 189, 248, 0.15); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+        .info-box { 
+            background: rgba(251, 191, 36, 0.08); 
+            border: 1px solid var(--warning); 
+            color: var(--warning); 
+            padding: 10px; 
+            font-size: 0.8rem; 
+            margin-bottom: 12px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -142,23 +154,26 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Ampumaurheilun tulos- ja kehitysseuranta</p>
+        <p>Vertailussa max 5 ampujaa samoilla rajauksilla</p>
     </header>
 
     <div class="grid">
         <div>
             <div class="card">
-                <h2>Lisää ampuja</h2>
+                <h2>Lisää ampuja (max 5)</h2>
                 <label for="uusiNimi">Nimi:</label>
                 <input type="text" id="uusiNimi" placeholder="Esim. Matti Meikäläinen">
 
                 <label for="uusiId">Sportti-ID:</label>
                 <input type="text" id="uusiId" placeholder="Esim. 60332562">
 
-                <button onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
+                <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
 
-                <label style="margin-top: 14px;">Tallennetut ampujat:</label>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 14px;">
+                    <label style="margin:0;">Tallennetut ampujat:</label>
+                    <span id="ampujatMaara" style="font-size:0.75rem; color:var(--text-muted); font-weight:bold;">0/5</span>
+                </div>
                 <div id="ampujatLista"></div>
             </div>
 
@@ -177,6 +192,10 @@
         </div>
 
         <div>
+            <div id="vertailuIlmoitus" class="info-box" style="display: none;">
+                ⚠️ Vertailua varten täytyy valita tietty <b>Laji</b> ja <b>Sarja</b> (ei "Kaikki").
+            </div>
+
             <div class="card">
                 <h2>Keskiarvot & Trendi</h2>
                 <div id="ampujatStats" class="stats-grid"></div>
@@ -208,7 +227,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v7.0_COMPACT_FLAT";
+const KITI_VERSIO = "v8.0_COMPARE_5";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -218,7 +237,7 @@ let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
-const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc', '#f472b6', '#22d3ee'];
+const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 
 function alusta() {
     paivitaAmpujatLista();
@@ -287,6 +306,11 @@ function tunnistaKisanPaivamaara(row) {
 }
 
 async function lisaaJaHaeAmpuja() {
+    if (ampujat.length >= 5) {
+        alert("Voit lisätä enintään 5 ampujaa vertailuun. Poista ensin joku ampujista.");
+        return;
+    }
+
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
     if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
@@ -359,6 +383,12 @@ function poistaAmpuja(index) {
 
 function paivitaAmpujatLista() {
     const lista = document.getElementById("ampujatLista");
+    const maaraEl = document.getElementById("ampujatMaara");
+    const lisaaBtn = document.getElementById("lisaaBtn");
+
+    maaraEl.innerText = `${ampujat.length}/5`;
+    lisaaBtn.disabled = ampujat.length >= 5;
+
     if (ampujat.length === 0) {
         lista.innerHTML = '<p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0;">Ei tallennettuja ampujia.</p>';
         return;
@@ -411,6 +441,15 @@ function laskeKA(arr) {
 function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
+    const infoEl = document.getElementById("vertailuIlmoitus");
+
+    // Tarkistetaan vaatimus: Jos >1 ampujaa, täytyy laji ja sarja olla lukittuna
+    const onEiValittu = (valittuLaji === "Kaikki" || valittuSarja === "Kaikki");
+    if (ampujat.length > 1 && onEiValittu) {
+        infoEl.style.display = "block";
+    } else {
+        infoEl.style.display = "none";
+    }
 
     let data = tulosData.filter(d => 
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
@@ -445,7 +484,7 @@ function paivitaNakyma() {
             `;
         }).join("");
     } else {
-        statsContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); padding:4px;">Ei tuloksia.</div>';
+        statsContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); padding:4px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
     const tbody = document.getElementById("tulosTaulukko");
