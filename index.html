@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v43.0</title>
+    <title>KITI Tulosvertailu v45.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v43.0_STABLE_RANK";
+const KITI_VERSIO = "v45.0_STABLE_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -307,72 +307,29 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Varma sijoituksen haku: käsittelee joustavasti kaikki KITI-rajapinnan palautusmuodot
-async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
-    if (!sportId || !categoryId) return "-";
+// Varma sijoituksen laskenta valitulle lajille ja sarjalle
+function haeDynaaminenSijoitus(ampujaNimi, valittuLaji, valittuSarja) {
+    if (valittuLaji === "Kaikki" || valittuSarja === "Kaikki") return "Valitse laji ja sarja";
 
-    try {
-        const etsittavaKokoNimi = ampujaNimi.trim().toLowerCase();
-        const osat = etsittavaKokoNimi.split(" ");
-        const etunimi = osat[0];
-        const sukunimi = osat[osat.length - 1];
+    const samanSarjanTulokset = tulosData.filter(d => d.laji === valittuLaji && d.sarja === valittuSarja);
+    if (samanSarjanTulokset.length === 0) return "-";
 
-        let kaikkiRivit = [];
-
-        for (let page = 1; page <= 5; page++) {
-            const url = `/api/statistics?sport=${sportId}&category=${categoryId}&page=${page}&nocache=${Date.now()}`;
-            const response = await fetch(url);
-            if (!response.ok) break;
-
-            const data = await response.json();
-            // Varmistetaan tuki erilaisille JSON-rakenteille (taulukko, .content, .results, .data)
-            const rows = Array.isArray(data) ? data : (data.content || data.results || data.data || []);
-            if (rows.length === 0) break;
-
-            kaikkiRivit.push(...rows);
+    const ampujanParhaat = {};
+    samanSarjanTulokset.forEach(d => {
+        const nimi = d.ampuja;
+        if (!ampujanParhaat[nimi] || d.tulos > ampujanParhaat[nimi]) {
+            ampujanParhaat[nimi] = d.tulos;
         }
+    });
 
-        if (kaikkiRivit.length === 0) return "-";
+    const rankingLista = Object.entries(ampujanParhaat).map(([nimi, parasTulos]) => ({
+        nimi,
+        parasTulos
+    })).sort((a, b) => b.parasTulos - a.parasTulos);
 
-        const prosessoidutRivit = kaikkiRivit.map(r => {
-            const tRaw = r.score !== undefined ? r.score : (r.totalScore !== undefined ? r.totalScore : (r.result !== undefined ? r.result : 0));
-            const tulos = parseFloat(String(tRaw).replace(",", ".")) || 0;
-
-            let nimi = "";
-            if (r.competitor && typeof r.competitor === 'object') {
-                nimi = `${r.competitor.first_name || ''} ${r.competitor.last_name || ''}`.trim();
-            } else if (r.shooter && typeof r.shooter === 'object') {
-                nimi = `${r.shooter.first_name || ''} ${r.shooter.last_name || ''}`.trim();
-            } else {
-                nimi = String(r.shooter_name || r.competitor_name || r.name || "").trim();
-            }
-
-            return { nimi: nimi.toLowerCase(), tulos };
-        }).filter(r => r.nimi.length > 0);
-
-        // Järjestetään tuloksen mukaan laskevasti (suurin tulos ensin)
-        prosessoidutRivit.sort((a, b) => b.tulos - a.tulos);
-
-        const nahdytUrheilijat = new Set();
-        let sijoitusLaskuri = 0;
-
-        for (const rivi of prosessoidutRivit) {
-            const tunniste = rivi.nimi;
-            
-            if (!nahdytUrheilijat.has(tunniste)) {
-                nahdytUrheilijat.add(tunniste);
-                sijoitusLaskuri++;
-
-                const onOsuma = (tunniste === etsittavaKokoNimi) || 
-                                (tunniste.includes(etunimi) && tunniste.includes(sukunimi));
-
-                if (onOsuma) {
-                    return `${sijoitusLaskuri}.`;
-                }
-            }
-        }
-    } catch (e) {
-        console.error("Virhe sijoitushaussa:", e);
+    const sijoitusIndeksi = rankingLista.findIndex(r => r.nimi.toLowerCase() === ampujaNimi.toLowerCase());
+    if (sijoitusIndeksi !== -1) {
+        return `${sijoitusIndeksi + 1}.`;
     }
 
     return "-";
@@ -481,9 +438,6 @@ async function lisaaJaHaeAmpuja() {
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", "."));
-            
-            const sportId = row.sport_id || row.sportId || (row.sport && row.sport.id) || "1";
-            const categoryId = row.category_id || row.categoryId || (row.category && row.category.id) || "8";
 
             return {
                 pvm: tunnistaKisanPaivamaara(row),
@@ -491,9 +445,7 @@ async function lisaaJaHaeAmpuja() {
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
-                tulos: tulos,
-                sportId: String(sportId),
-                categoryId: String(categoryId)
+                tulos: tulos
             };
         }).filter(r => r.tulos > 0);
 
@@ -697,11 +649,13 @@ function paivitaNakyma() {
             const hajonta = laskeHajonta(aTuloksetRajatut);
             const vari = variPaletti[idx % variPaletti.length];
 
+            const sijoitusTeksti = haeDynaaminenSijoitus(amp, valittuLaji, valittuSarja);
+
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat" title="Sijoitus Kitin tilastossa valitulle lajille ja sarjalle"><span class="val" id="sij_el_${ampObj.id}" style="color:var(--success);">...</span><span class="lbl">Sijoitus</span></div>
+                        <div class="sub-stat" title="Sijoitus valitulle lajille ja sarjalle"><span class="val" style="color:var(--success); font-size:0.95rem;">${sijoitusTeksti}</span><span class="lbl">Sijoitus</span></div>
                         <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
                         <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
@@ -717,33 +671,6 @@ function paivitaNakyma() {
                 </div>
             `;
         }).join("");
-
-        // Haetaan dynaamisesti sijoitus nykyiselle valinnalle (Laji + Sarja)
-        aktiivisetAmpujat.forEach(async (ampObj) => {
-            const elem = document.getElementById(`sij_el_${ampObj.id}`);
-            
-            const ampujaRivit = data.filter(d => d.ampuja === ampObj.nimi);
-            let targetSportId = null;
-            let targetCategoryId = null;
-
-            if (ampujaRivit.length > 0) {
-                targetSportId = ampujaRivit[0].sportId;
-                targetCategoryId = ampujaRivit[0].categoryId;
-            } else {
-                const kaikkirivit = tulosData.filter(d => d.ampuja === ampObj.nimi);
-                if (kaikkirivit.length > 0) {
-                    targetSportId = kaikkirivit[0].sportId;
-                    targetCategoryId = kaikkirivit[0].categoryId;
-                }
-            }
-
-            if (targetSportId && targetCategoryId) {
-                const sij = await haeTarkkaSijoitus(ampObj.nimi, targetSportId, targetCategoryId);
-                if (elem) elem.innerText = sij;
-            } else {
-                if (elem) elem.innerText = "-";
-            }
-        });
 
     } else {
         statsContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:8px;">Ei aktiivisia ampujia valittuna.</div>';
