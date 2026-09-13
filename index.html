@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v104.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v105.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -227,7 +227,6 @@
         th, td { padding: 13px 16px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
         th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 800; text-transform: uppercase; font-size: 0.88rem; letter-spacing: 0.5px; }
         tr:last-child td { border-bottom: none; }
-        tr:hover td { background-color: var(--table-hover); }
 
         .ampuja-item { 
             display: flex; 
@@ -385,7 +384,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v104.0_NO_DATES_IN_CHART";
+const KITI_VERSIO = "v105.0_COLOR_CODED_TABLE_ROWS";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -869,16 +868,24 @@ async function paivitaNakyma() {
     }
 
     const tbody = document.getElementById("tulosTaulukko");
+    const isDark = document.body.getAttribute("data-theme") === "dark";
+
     tbody.innerHTML = jarjestaPvmMukaan(taulukkoData, true).map((d) => {
         let kilpailuSolu = d.kilpailu;
         if (d.kisaId) {
             kilpailuSolu = `<a href="https://kiti.ampumaurheiluliitto.fi/#/competition/${d.kisaId}" target="_blank" class="kiti-link">${d.kilpailu} ↗</a>`;
         }
+
+        // Haetaan ampujan indeksi värin määrittelyä varten
+        const ampIndex = aktiivisetAmpujat.findIndex(a => a.nimi === d.ampuja);
+        const vari = variPaletti[ampIndex !== -1 ? (ampIndex % variPaletti.length) : 0];
+        const tausta vari = isDark ? `rgba(2, 132, 199, 0.03)` : `rgba(2, 132, 199, 0.02)`;
+
         return `
-            <tr>
+            <tr style="border-left: 4px solid ${vari}; background-color: ${isDark ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.01)'};">
                 <td><b>${d.pvm}</b></td>
                 <td>${kilpailuSolu}</td>
-                <td><b>${d.ampuja}</b></td>
+                <td><b style="color: ${vari};">${d.ampuja}</b></td>
                 <td><span class="tag">${d.seura || '-'}</span></td>
                 <td><span class="tag tag-laji">${d.laji}</span></td>
                 <td><span class="tag">${d.sarja}</span></td>
@@ -898,7 +905,6 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
     const jarjestettyKokoData = jarjestaPvmMukaan(data, false);
     
-    // Korjattu: käytetään kaaviossa pelkkää kilpailun nimeä ilman päivämäärää
     const labelSet = new Set();
     jarjestettyKokoData.forEach(d => {
         labelSet.add(d.kilpailu);
