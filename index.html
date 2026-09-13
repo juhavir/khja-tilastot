@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v95.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v97.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -385,7 +385,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v95.0_EXACT_COMPETITION_LINK";
+const KITI_VERSIO = "v97.0_KITI_LINK_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -448,12 +448,14 @@ function etsiKilpailunNimi(row) {
 }
 
 function etsiKilpailuId(row) {
+    // Etsitään suoraan kilpailu-objektista tai riviltä tunniste
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
         if (c.id !== undefined && c.id !== null) return c.id;
     }
     if (row.competition_id !== undefined && row.competition_id !== null) return row.competition_id;
     if (row.competitionId !== undefined && row.competitionId !== null) return row.competitionId;
+    if (row.id !== undefined && row.id !== null) return row.id;
     return null;
 }
 
@@ -749,7 +751,7 @@ async function haeTilastoSijoitus(ampujanNimi, laji, sarja, callback) {
         return;
     }
     try {
-        const resp = await fetch(`/api/resultlist/?fields!=partial&sport=1&category=8&level=1,2,3,4,5,6,7,8,9,10`);
+        const resp = await fetch(`/api/resultlist/?fields!=partial&sport=1&level=1,2,3,4,5,6,7,8,9,10`);
         if (!resp.ok) {
             callback("-");
             return;
@@ -766,9 +768,9 @@ async function haeTilastoSijoitus(ampujanNimi, laji, sarja, callback) {
                    rNimi.toLowerCase().includes(ampujanNimi.toLowerCase());
         }).sort((a, b) => parseFloat(String(b.result || 0).replace(",",".")) - parseFloat(String(a.result || 0).replace(",",".")));
 
-        if (sopivat.length > 0 && sopivat[0].position !== undefined) {
+        if (sopivat.length > 0 && sopivat[0].position !== undefined && sopivat[0].position !== null) {
             callback(`#${sopivat[0].position}`);
-        } else if (sopivat.length > 0 && sopivat[0].position_pre !== undefined) {
+        } else if (sopivat.length > 0 && sopivat[0].position_pre !== undefined && sopivat[0].position_pre !== null) {
             callback(`#${sopivat[0].position_pre}`);
         } else {
             callback("-");
