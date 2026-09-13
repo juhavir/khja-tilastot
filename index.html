@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v90.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v92.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v90.0_GLOBAL_RANKING_SUPPORT";
+const KITI_VERSIO = "v92.0_STATISTICS_ENDPOINT_SUPPORT";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -507,7 +507,7 @@ function lueSija(row) {
     for (const s of sijaArvot) {
         if (s !== undefined && s !== null && s !== "") {
             const parsed = parseInt(s, 10);
-            if (!isNaN(parsed)) return parsed;
+            if (!isNaN(parsed) && parsed > 0) return parsed;
         }
     }
     return null;
@@ -722,7 +722,44 @@ function laskeHajonta(arr) {
     return Math.sqrt(neliotSumma / arr.length).toFixed(1);
 }
 
-function paivitaNakyma() {
+// Haetaan statistiikkarajapinnasta sijoitus valitulle lajille ja sarjalle
+async function haeTilastoSijoitus(ampujanNimi, laji, sarja, callback) {
+    if (laji === "Kaikki" || sarja === "Kaikki") {
+        callback("-");
+        return;
+    }
+    try {
+        const resp = await fetch(`/api/resultlist/?fields!=partial&sport=1&category=8&level=1,2,3,4,5,6,7,8,9,10`);
+        if (!resp.ok) {
+            callback("-");
+            return;
+        }
+        const data = await resp.json();
+        const tulokset = Array.isArray(data) ? data : (data.results || data.content || []);
+        
+        // Suodatetaan vastaamaan lajia, sarjaa ja ampujaa, järjestetään tuloksen mukaan laskevasti
+        const sopivat = tulokset.filter(r => {
+            const rLaji = lueLaji(r);
+            const rSarja = lueSarja(r);
+            const rNimi = `${r.first_name || ''} ${r.last_name || ''}`.trim();
+            return rLaji.toLowerCase() === laji.toLowerCase() && 
+                   rSarja.toLowerCase() === sarja.toLowerCase() && 
+                   rNimi.toLowerCase().includes(ampujanNimi.toLowerCase());
+        }).sort((a, b) => parseFloat(String(b.result || 0).replace(",",".")) - parseFloat(String(a.result || 0).replace(",",".")));
+
+        if (sopivat.length > 0 && sopivat[0].position !== undefined) {
+            callback(`#${sopivat[0].position}`);
+        } else if (sopivat.length > 0 && sopivat[0].position_pre !== undefined) {
+            callback(`#${sopivat[0].position_pre}`);
+        } else {
+            callback("-");
+        }
+    } catch (e) {
+        callback("-");
+    }
+}
+
+async function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
     const maaraValinta = document.getElementById("maaraSelect").value;
@@ -747,6 +784,7 @@ function paivitaNakyma() {
     const statsContainer = document.getElementById("ampujatStats");
 
     if (aktiivisetAmpujat.length > 0) {
+        // Alustava renderöinti ilman statistiikkasijoitusta, joka päivittyy asynkronisesti
         statsContainer.innerHTML = aktiivisetAmpujat.map((ampObj, idx) => {
             const amp = ampObj.nimi;
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
@@ -781,16 +819,6 @@ function paivitaNakyma() {
             const valitunAjanParas = aTuloksetRajatut.length > 0 ? Math.max(...aTuloksetRajatut) : pb;
             const valitunAjanHeikoin = aTuloksetRajatut.length > 0 ? Math.min(...aTuloksetRajatut) : "-";
 
-            // Tarkistetaan onko suodatettu tietty laji ja sarja kaikkien aikojen sijoitusta varten
-            let sijoitusTeksti = "-";
-            if (valittuLaji !== "Kaikki" && valittuSarja !== "Kaikki" && aRivitKaikki.length > 0) {
-                // Lasketaan sijoitus suhteessa tallennettuihin tai haetaan paras sija tästä lajista/sarjasta
-                const parhaatSijat = aRivitKaikki.filter(d => d.sija !== null).map(d => d.sija);
-                if (parhaatSijat.length > 0) {
-                    sijoitusTeksti = `#${Math.min(...parhaatSijat)}`;
-                }
-            }
-
             let trendiTxt = "-";
             if (aRivitRajattu.length >= 2) {
                 const ero = (aRivitRajattu[0].tulos - aRivitRajattu[1].tulos).toFixed(1);
@@ -801,7 +829,7 @@ function paivitaNakyma() {
             const vari = variPaletti[idx % variPaletti.length];
 
             return `
-                <div class="stat-box" style="border-top: 3px solid ${vari};">
+                <div class="stat-box" style="border-top: 3px solid ${vari};" id="stat_box_${idx}">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat" title="Voitetut 1. sijat"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
@@ -814,13 +842,24 @@ function paivitaNakyma() {
                     </div>
                     <div class="extra-stats">
                         <div title="Koko historian korkein tulos">Ennätys (PB)<b>${pb}</b></div>
-                        <div title="Paras sijoitus valitussa lajissa ja sarjassa">Paras sija<b>${sijoitusTeksti}</b></div>
+                        <div title="Paras sijoitus valitussa lajissa ja sarjassa tilastoissa" id="stat_sija_${idx}">Paras sija<b>Ladataan...</b></div>
                         <div title="Valitun ajanjakson matalin tulos">Valitun heikoin<b>${valitunAjanHeikoin}</b></div>
                         <div title="Tulosten keskihajonta sekä viimeisimmän kisan muutos">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
                 </div>
             `;
         }).join("");
+
+        // Haetaan taustalla sijoitukset tilastosivun kautta
+        aktiivisetAmpujat.forEach((ampObj, idx) => {
+            haeTilastoSijoitus(ampObj.nimi, valittuLaji, valittuSarja, (sijaStr) => {
+                const sijaEl = document.getElementById(`stat_sija_${idx}`);
+                if (sijaEl) {
+                    sijaEl.innerHTML = `Paras sija<b>${sijaStr}</b>`;
+                }
+            });
+        });
+
     } else {
         statsContainer.innerHTML = '<div style="font-size:0.78rem; color:var(--text-muted); padding:6px;">Ei aktiivisia ampujia valittuna.</div>';
     }
