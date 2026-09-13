@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v34.0</title>
+    <title>KITI Tulosvertailu v35.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v34.0_EXACT_PARAM_RANK";
+const KITI_VERSIO = "v35.0_PROXY_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -308,18 +308,17 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan sijoitus KITI-tilastosta annetulla laji-ID:llä (sport) ja sarja-ID:llä (category)
+// Haetaan sijoitus oman /api/statistics Vercel-proxyrajapinnan läpi
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     const key = `${ampujaNimi.toLowerCase().trim()}_${sportId}_${categoryId}`;
     if (sijoitusCache[key]) return sijoitusCache[key];
 
     try {
         const osat = ampujaNimi.trim().toLowerCase().split(" ");
-        const sukunimi = osat[osat.length - 1]; // Vertailun tueksi sukunimi
+        const sukunimi = osat[osat.length - 1];
 
-        // Selaillaan sivuja 1-8
-        for (let page = 1; page <= 8; page++) {
-            const url = `/api/resultlist/?fields!=partial&sport=${sportId}&category=${categoryId}&level=11,10,8&type=1&limit=25&page=${page}&nocache=${Date.now()}`;
+        for (let page = 1; page <= 6; page++) {
+            const url = `/api/statistics?sport=${sportId}&category=${categoryId}&level=11,10,8&page=${page}&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
 
@@ -470,9 +469,8 @@ async function lisaaJaHaeAmpuja() {
         }).filter(r => r.tulos > 0);
 
         if (uudet.length > 0) {
-            // Kaivetaan urheilijan raakadatasta sport_id ja category_id
             let autoSportId = "1";
-            let autoCategoryId = "8"; // Oletus esim N16 / vastaava jos ei löydy
+            let autoCategoryId = "8";
 
             if (parasRivi && parasRivi.rawRow) {
                 const r = parasRivi.rawRow;
@@ -702,7 +700,7 @@ function paivitaNakyma() {
             `;
         }).join("");
 
-        // Haetaan jokaiselle ampujalle sijoitus asynkronisesti
+        // Haetaan asynkronisesti sijoitus uuden /api/statistics rajapinnan kautta
         aktiivisetAmpujat.forEach(async (ampObj) => {
             const sij = await haeTarkkaSijoitus(ampObj.nimi, ampObj.sportId || "1", ampObj.categoryId || "8");
             const elem = document.getElementById(`sij_el_${ampObj.id}`);
