@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v89.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v90.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v89.0_NUMERIC_MAPPING_FIX";
+const KITI_VERSIO = "v90.0_GLOBAL_RANKING_SUPPORT";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -387,7 +387,6 @@ let myChart = null;
 
 const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
 
-// Virallinen numeerinen lajikartta (päivitettävissä tarpeen mukaan)
 const lajiMap = {
     "1": "10m ilmakivääri",
     "2": "10m ilmapistooli",
@@ -441,19 +440,12 @@ function etsiKilpailunNimi(row) {
 function muunnaLajiksi(arvo) {
     if (arvo === undefined || arvo === null) return null;
     const str = String(arvo).trim();
-    // Jos kyseessä on pelkkä numero, tarkistetaan löytyykö kartasta
-    if (lajiMap[str]) {
-        return lajiMap[str];
-    }
-    // Jos se ei ole pelkkä numero, palautetaan sellaisenaan
-    if (isNaN(str)) {
-        return str;
-    }
+    if (lajiMap[str]) return lajiMap[str];
+    if (isNaN(str)) return str;
     return null;
 }
 
 function lueLaji(row) {
-    // 1. Tarkistetaan competition.type_info
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
         if (c.type_info) {
@@ -471,7 +463,6 @@ function lueLaji(row) {
         }
     }
 
-    // 2. Tarkistetaan suorat rivin kentät
     const mahdolliset = [row.type, row.disciplineName, row.sportName, row.sport, row.discipline];
     for (const m of mahdolliset) {
         if (m !== undefined && m !== null) {
@@ -485,7 +476,6 @@ function lueLaji(row) {
         }
     }
 
-    // 3. Viimeisenä turvana tutkitaan kilpailun nimi
     const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
     if (kisaNimi.includes("ilmakivääri")) return "10m ilmakivääri";
     if (kisaNimi.includes("ilmapistooli")) return "10m ilmapistooli";
@@ -791,6 +781,16 @@ function paivitaNakyma() {
             const valitunAjanParas = aTuloksetRajatut.length > 0 ? Math.max(...aTuloksetRajatut) : pb;
             const valitunAjanHeikoin = aTuloksetRajatut.length > 0 ? Math.min(...aTuloksetRajatut) : "-";
 
+            // Tarkistetaan onko suodatettu tietty laji ja sarja kaikkien aikojen sijoitusta varten
+            let sijoitusTeksti = "-";
+            if (valittuLaji !== "Kaikki" && valittuSarja !== "Kaikki" && aRivitKaikki.length > 0) {
+                // Lasketaan sijoitus suhteessa tallennettuihin tai haetaan paras sija tästä lajista/sarjasta
+                const parhaatSijat = aRivitKaikki.filter(d => d.sija !== null).map(d => d.sija);
+                if (parhaatSijat.length > 0) {
+                    sijoitusTeksti = `#${Math.min(...parhaatSijat)}`;
+                }
+            }
+
             let trendiTxt = "-";
             if (aRivitRajattu.length >= 2) {
                 const ero = (aRivitRajattu[0].tulos - aRivitRajattu[1].tulos).toFixed(1);
@@ -814,7 +814,7 @@ function paivitaNakyma() {
                     </div>
                     <div class="extra-stats">
                         <div title="Koko historian korkein tulos">Ennätys (PB)<b>${pb}</b></div>
-                        <div title="Valitun ajanjakson paras tulos">Valitun paras<b>${valitunAjanParas}</b></div>
+                        <div title="Paras sijoitus valitussa lajissa ja sarjassa">Paras sija<b>${sijoitusTeksti}</b></div>
                         <div title="Valitun ajanjakson matalin tulos">Valitun heikoin<b>${valitunAjanHeikoin}</b></div>
                         <div title="Tulosten keskihajonta sekä viimeisimmän kisan muutos">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
