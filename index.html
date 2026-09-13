@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v38.0</title>
+    <title>KITI Tulosvertailu v40.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -232,12 +232,12 @@
             <div class="card">
                 <h2>Suodatus</h2>
                 <label for="lajiSelect">Laji</label>
-                <select id="lajiSelect" onchange="sijoitusCache = {}; paivitaValikot(false); paivitaNakyma();">
+                <select id="lajiSelect" onchange="paivitaValikot(false); paivitaNakyma();">
                     <option value="Kaikki">Kaikki lajit</option>
                 </select>
 
                 <label for="sarjaSelect">Sarja</label>
-                <select id="sarjaSelect" onchange="sijoitusCache = {}; paivitaNakyma();">
+                <select id="sarjaSelect" onchange="paivitaNakyma();">
                     <option value="Kaikki">Kaikki sarjat</option>
                 </select>
 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v38.0_FIXED_RANK_CACHE";
+const KITI_VERSIO = "v40.0_UNIQUE_SHOOTERS_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -297,7 +297,6 @@ if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
 let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
-let sijoitusCache = {};
 
 const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 
@@ -308,15 +307,13 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan tarkka sijoitus KITI-tilastosta kokonimitäsmäyksellä
+// Haetaan sijoitus ryhmittelemällä suoritukset urheilijakohtaisesti (jokainen ampuja lasketaan vain kerran)
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     if (!sportId || !categoryId) return "-";
 
-    const key = `${ampujaNimi.toLowerCase().trim()}_${sportId}_${categoryId}`;
-    if (sijoitusCache[key]) return sijoitusCache[key];
-
     try {
         const etsittavaKokoNimi = ampujaNimi.trim().toLowerCase();
+        const nahdytUrheilijat = new Set(); // Uniikit ampujat
 
         for (let page = 1; page <= 8; page++) {
             const url = `/api/statistics?sport=${sportId}&category=${categoryId}&page=${page}&nocache=${Date.now()}`;
@@ -339,11 +336,13 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
                     ""
                 ).trim().toLowerCase();
 
-                // Varmistetaan, että etu- ja sukunimi täsmäävät täysin ennen kuin sijoitus luetaan
-                if (ampujaNimiKiti === etsittavaKokoNimi || JSON.stringify(r).toLowerCase().includes(etsittavaKokoNimi)) {
-                    let sij = r.place || r.rank || r.position || ((page - 1) * 25 + i + 1);
-                    sijoitusCache[key] = `${sij}.`;
-                    return `${sij}.`;
+                if (ampujaNimiKiti) {
+                    nahdytUrheilijat.add(ampujaNimiKiti);
+
+                    if (ampujaNimiKiti === etsittavaKokoNimi || JSON.stringify(r).toLowerCase().includes(etsittavaKokoNimi)) {
+                        const oikeaSijoitus = nahdytUrheilijat.size;
+                        return `${oikeaSijoitus}.`;
+                    }
                 }
             }
         }
@@ -351,7 +350,6 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
         console.error("Virhe sijoitushaussa:", e);
     }
 
-    sijoitusCache[key] = "-";
     return "-";
 }
 
@@ -490,7 +488,6 @@ async function lisaaJaHaeAmpuja() {
             
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
-            sijoitusCache = {};
             paivitaAmpujatLista();
             paivitaValikot(true);
             paivitaNakyma();
@@ -516,7 +513,6 @@ function poistaAmpuja(index) {
     tulosData = tulosData.filter(d => d.ampuja !== poistettava.nimi);
     localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
-    sijoitusCache = {};
     paivitaAmpujatLista();
     paivitaValikot(false);
     paivitaNakyma();
@@ -697,8 +693,10 @@ function paivitaNakyma() {
             `;
         }).join("");
 
-        // Haetaan sijoitus dynaamisesti valittujen laji/sarja-suodattimien perusteella
+        // Haetaan dynaamisesti sijoitus nykyiselle valinnalle (Laji + Sarja)
         aktiivisetAmpujat.forEach(async (ampObj) => {
+            const elem = document.getElementById(`sij_el_${ampObj.id}`);
+            
             const ampujaRivit = data.filter(d => d.ampuja === ampObj.nimi);
             let targetSportId = null;
             let targetCategoryId = null;
@@ -714,9 +712,12 @@ function paivitaNakyma() {
                 }
             }
 
-            const sij = await haeTarkkaSijoitus(ampObj.nimi, targetSportId, targetCategoryId);
-            const elem = document.getElementById(`sij_el_${ampObj.id}`);
-            if (elem) elem.innerText = sij;
+            if (targetSportId && targetCategoryId) {
+                const sij = await haeTarkkaSijoitus(ampObj.nimi, targetSportId, targetCategoryId);
+                if (elem) elem.innerText = sij;
+            } else {
+                if (elem) elem.innerText = "-";
+            }
         });
 
     } else {
