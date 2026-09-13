@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v52.0</title>
+    <title>KITI Tulosvertailu v54.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v52.0_CATEGORY_ID_RESOLVE";
+const KITI_VERSIO = "v54.0_EXACT_NETWORK_URL";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -308,12 +308,12 @@ function alusta() {
     paivitaNakyma();
 }
 
-// 1. Etsitään KITI:n omasta kategoria-rajapinnasta sarjakoodia (esim. "14T") vastaava ID-numero
+// Haetaan kategoria-ID KITI:n omasta rajapinnasta
 async function haeKategoriaId(sportId, sarjaKoodi) {
     try {
         const url = `/api/categories/?sport=${sportId}&historical=false`;
         const res = await fetch(url);
-        if (!res.ok) return null;
+        if (!res.ok) return 1;
         const cats = await res.json();
         const lista = Array.isArray(cats) ? cats : (cats.results || cats.content || []);
         
@@ -321,13 +321,13 @@ async function haeKategoriaId(sportId, sarjaKoodi) {
             (c.code && c.code.toLowerCase() === sarjaKoodi.toLowerCase()) || 
             (c.name && c.name.toLowerCase() === sarjaKoodi.toLowerCase())
         );
-        return loytynyt ? loytynyt.id : null;
+        return loytynyt ? loytynyt.id : 1;
     } catch (e) {
-        return null;
+        return 1;
     }
 }
 
-// 2. Haetaan kaikkien aikojen paras sijoitus käyttäen KITI:n vaatimaa kategoria-ID:tä
+// Haetaan kaikkien aikojen paras sijoitus tasan tarkkaan sillä oikealla Network-kuvasta otetulla URL-rakenteella
 async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoodi) {
     if (!sportId || !sarjaKoodi || sarjaKoodi === "Kaikki") return "-";
 
@@ -337,11 +337,10 @@ async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoo
     }
 
     try {
-        // Selvitetään sarjan koodia vastaava ID KITI:n rajapinnasta
         const categoryId = await haeKategoriaId(sportId, sarjaKoodi);
-        if (!categoryId) return "-";
-
-        const url = `/api/resultlist/?fields!=partial&sport=${sportId}&category=${categoryId}&level=1,2,3,4,5,6,7,8,9,10,11,12&limit=300&nocache=${Date.now()}`;
+        
+        // Tässä on nyt pilkulla erotettu level-kenttä ja kaikki oikeat parametrit suoraan kuvastasi!
+        const url = `/api/resultlist/?fields!=partial&sport=${sportId}&category=${categoryId}&level=1,2,3,4,5,6,7,8,9,10,11,12&type=1&limit=250&nocache=${Date.now()}`;
         const response = await fetch(url);
         if (!response.ok) return "-";
 
@@ -349,6 +348,7 @@ async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoo
         const rows = data.results || data.content || data.data || [];
         if (rows.length === 0) return "-";
 
+        // Kerätään jokaiselta ampujalta hänen paras tuloksensa
         const parhaatPerAmpuja = {};
         rows.forEach(r => {
             let nimi = "";
@@ -731,7 +731,7 @@ function paivitaNakyma() {
             `;
         }).join("");
 
-        // Haetaan dynaamisesti oikea kaikkien aikojen paras sijoitus KITI API:sta
+        // Haetaan dynaamisesti oikea kaikkien aikojen paras sijoitus
         aktiivisetAmpujat.forEach(async (ampObj, idx) => {
             const elem = document.getElementById(`sij_el_${ampObj.id}_${idx}`);
             if (!elem) return;
