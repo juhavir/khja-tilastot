@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v19.0</title>
+    <title>KITI Tulosvertailu v20.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v19.0_TOOLTIPS";
+const KITI_VERSIO = "v20.0_DYNAMIC_STATS";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -554,6 +554,7 @@ function paivitaNakyma() {
         infoEl.style.display = "none";
     }
 
+    // Perussuodatus lajille ja sarjalle
     let data = tulosData.filter(d => 
         aktiivisetAmpujatNimet.includes(d.ampuja) &&
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
@@ -566,6 +567,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = aktiivisetAmpujatNimet.map((amp, idx) => {
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
             
+            // Rajataan ensin vasemman paneelin kisa-määrän mukaan
             let aRivitRajattu = aRivitKaikki;
             if (maaraValinta !== "kaikki") {
                 const rajoitus = parseInt(maaraValinta, 10);
@@ -574,17 +576,24 @@ function paivitaNakyma() {
 
             const aTuloksetRajatut = aRivitRajattu.map(d => d.tulos);
             
-            const kaKaikki = laskeKA(aTuloksetRajatut);
+            // Lasketaan dynaamisesti keskiarvot valitun rajauksen sisällä:
+            // 1. Laatikko: Kaikki (valitun rajauksen keskiarvo)
+            // 2. Laatikko: Viimeiset 3 (tai rajauksen maksimi)
+            // 3. Laatikko: Viimeiset 5
+            // 4. Laatikko: Viimeiset 10
+            const kaValitut = laskeKA(aTuloksetRajatut);
+            const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
             const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
-            const kaV15 = laskeKA(aTuloksetRajatut.slice(0, 15));
+
+            const lbl1 = maaraValinta === "kaikki" ? "Valitut (Kaikki)" : `Valitut (${aRivitRajattu.length} kpl)`;
+            const lbl2 = "Viimeiset 3";
+            const lbl3 = "Viimeiset 5";
+            const lbl4 = "Viimeiset 10";
 
             const pb = aRivitKaikki.length > 0 ? Math.max(...aRivitKaikki.map(d => d.tulos)) : "-";
-            
-            // Valitun ajan parhaat ja heikoimmat (perustuu suodatettuun/valittuun listaan)
-            const valitunAjanTulokset = aRivitRajattu.map(d => d.tulos);
-            const valitunAjanParas = valitunAjanTulokset.length > 0 ? Math.max(...valitunAjanTulokset) : pb;
-            const valitunAjanHeikoin = valitunAjanTulokset.length > 0 ? Math.min(...valitunAjanTulokset) : "-";
+            const valitunAjanParas = aTuloksetRajatut.length > 0 ? Math.max(...aTuloksetRajatut) : pb;
+            const valitunAjanHeikoin = aTuloksetRajatut.length > 0 ? Math.min(...aTuloksetRajatut) : "-";
 
             let trendiTxt = "-";
             if (aRivitRajattu.length >= 2) {
@@ -597,12 +606,12 @@ function paivitaNakyma() {
 
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
-                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
+                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat" title="Kaikkien valittujen kilpailujen keskiarvo"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
-                        <div class="sub-stat" title="Viimeisen 5 kilpailun keskiarvo"><span class="val">${kaV5}</span><span class="lbl">Viimeiset 5</span></div>
-                        <div class="sub-stat" title="Viimeisen 10 kilpailun keskiarvo"><span class="val">${kaV10}</span><span class="lbl">Viimeiset 10</span></div>
-                        <div class="sub-stat" title="Viimeisen 15 kilpailun keskiarvo"><span class="val">${kaV15}</span><span class="lbl">Viimeiset 15</span></div>
+                        <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
+                        <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
+                        <div class="sub-stat" title="Viimeisen 5 kilpailun keskiarvo"><span class="val">${kaV5}</span><span class="lbl">${lbl3}</span></div>
+                        <div class="sub-stat" title="Viimeisen 10 kilpailun keskiarvo"><span class="val">${kaV10}</span><span class="lbl">${lbl4}</span></div>
                     </div>
                     <div class="extra-stats">
                         <div title="Koko historian / valinnan korkein tulos">Ennätys (PB)<b>${pb}</b></div>
