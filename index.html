@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v35.0</title>
+    <title>KITI Tulosvertailu v36.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v35.0_PROXY_RANK";
+const KITI_VERSIO = "v36.0_DYNAMIC_FILTER_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -308,8 +308,10 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan sijoitus oman /api/statistics Vercel-proxyrajapinnan läpi
+// Haetaan tarkka sijoitus KITI-tilastosta dynaamisesti valituilla parametreilla
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
+    if (!sportId || !categoryId) return "-";
+
     const key = `${ampujaNimi.toLowerCase().trim()}_${sportId}_${categoryId}`;
     if (sijoitusCache[key]) return sijoitusCache[key];
 
@@ -445,17 +447,12 @@ async function lisaaJaHaeAmpuja() {
             throw new Error("Antamallasi Sportti-ID:llä ei löytynyt tuloksia.");
         }
 
-        let parasRivi = null;
-        let maksimiTulos = -1;
-
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", "."));
             
-            if (tulos > maksimiTulos) {
-                maksimiTulos = tulos;
-                parasRivi = row;
-            }
+            const sportId = row.sport_id || row.sportId || (row.sport && row.sport.id) || "1";
+            const categoryId = row.category_id || row.categoryId || (row.category && row.category.id) || "8";
 
             return {
                 pvm: tunnistaKisanPaivamaara(row),
@@ -464,27 +461,17 @@ async function lisaaJaHaeAmpuja() {
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
                 tulos: tulos,
-                rawRow: row
+                sportId: String(sportId),
+                categoryId: String(categoryId)
             };
         }).filter(r => r.tulos > 0);
 
         if (uudet.length > 0) {
-            let autoSportId = "1";
-            let autoCategoryId = "8";
-
-            if (parasRivi && parasRivi.rawRow) {
-                const r = parasRivi.rawRow;
-                autoSportId = r.sport_id || r.sportId || (r.sport && r.sport.id) || "1";
-                autoCategoryId = r.category_id || r.categoryId || (r.category && r.category.id) || "8";
-            }
-
             if (!ampujat.some(a => a.id === id)) {
-                ampujat.push({ nimi, id, aktiivinen: true, sportId: autoSportId, categoryId: autoCategoryId });
+                ampujat.push({ nimi, id, aktiivinen: true });
             } else {
                 let olemassa = ampujat.find(a => a.id === id);
                 olemassa.nimi = nimi;
-                olemassa.sportId = autoSportId;
-                olemassa.categoryId = autoCategoryId;
             }
             localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
 
@@ -700,9 +687,24 @@ function paivitaNakyma() {
             `;
         }).join("");
 
-        // Haetaan asynkronisesti sijoitus uuden /api/statistics rajapinnan kautta
+        // Haetaan sijoitus dynaamisesti valittujen laji/sarja-suodattimien perusteella
         aktiivisetAmpujat.forEach(async (ampObj) => {
-            const sij = await haeTarkkaSijoitus(ampObj.nimi, ampObj.sportId || "1", ampObj.categoryId || "8");
+            const ampujaRivit = data.filter(d => d.ampuja === ampObj.nimi);
+            let targetSportId = null;
+            let targetCategoryId = null;
+
+            if (ampujaRivit.length > 0) {
+                targetSportId = ampujaRivit[0].sportId;
+                targetCategoryId = ampujaRivit[0].categoryId;
+            } else {
+                const kaikkirivit = tulosData.filter(d => d.ampuja === ampObj.nimi);
+                if (kaikkirivit.length > 0) {
+                    targetSportId = kaikkirivit[0].sportId;
+                    targetCategoryId = kaikkirivit[0].categoryId;
+                }
+            }
+
+            const sij = await haeTarkkaSijoitus(ampObj.nimi, targetSportId, targetCategoryId);
             const elem = document.getElementById(`sij_el_${ampObj.id}`);
             if (elem) elem.innerText = sij;
         });
