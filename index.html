@@ -170,7 +170,7 @@
             <div class="card">
                 <h2>Suodatus & Rajaus</h2>
                 <label for="lajiSelect">Laji:</label>
-                <select id="lajiSelect" onchange="paivitaValikot(); paivitaNakyma();">
+                <select id="lajiSelect" onchange="paivitaValikot(false); paivitaNakyma();">
                     <option value="Kaikki">Kaikki lajit</option>
                 </select>
 
@@ -184,7 +184,7 @@
                     <option value="all">Kaikki tulokset</option>
                     <option value="3">Viimeiset 3 kk</option>
                     <option value="6">Viimeiset 6 kk</option>
-                    <option value="12">Viimeiset 12 kk</option>
+                    <option value="12" selected>Viimeiset 12 kk</option>
                 </select>
             </div>
         </div>
@@ -229,7 +229,7 @@ const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc', '#f4
 
 function alusta() {
     paivitaAmpujatLista();
-    paivitaValikot();
+    paivitaValikot(true);
     paivitaNakyma();
 }
 
@@ -303,7 +303,6 @@ async function lisaaJaHaeAmpuja() {
 
         const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
 
-        // Sailytetaan alkuperainen indeksi (jarjestys KITI:ssa, joissa uusin kisa on alussa 0)
         const uudet = rows.map((row, index) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
@@ -311,7 +310,7 @@ async function lisaaJaHaeAmpuja() {
             let kisaNimi = etsiKilpailunNimi(row);
 
             return {
-                origIndex: index,
+                origIndex: index, // KITI:ssä index 0 = uusin kisa, suurin index = vanhin kisa
                 pvm: pvmPuhdas,
                 kilpailu: kisaNimi,
                 ampuja: nimi,
@@ -336,7 +335,7 @@ async function lisaaJaHaeAmpuja() {
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
             paivitaAmpujatLista();
-            paivitaValikot();
+            paivitaValikot(true);
             paivitaNakyma();
         } else {
             statusEl.style.color = "#fbbf24";
@@ -357,7 +356,7 @@ function poistaAmpuja(index) {
     localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
     paivitaAmpujatLista();
-    paivitaValikot();
+    paivitaValikot(false);
     paivitaNakyma();
 }
 
@@ -375,9 +374,9 @@ function paivitaAmpujatLista() {
     `).join("");
 }
 
-function paivitaValikot() {
+function paivitaValikot(asetaUusinOletukseksi = false) {
     const valittuLaji = document.getElementById("lajiSelect").value;
-    const valittuSarja = document.getElementById("sarjaSelect").value;
+    let valittuSarja = document.getElementById("sarjaSelect").value;
 
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
     document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
@@ -386,7 +385,17 @@ function paivitaValikot() {
     const suodatettuData = tulosData.filter(d => valittuLaji === "Kaikki" || d.laji === valittuLaji);
     const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
     document.getElementById("sarjaSelect").innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
-    if (sarjat.includes(valittuSarja)) document.getElementById("sarjaSelect").value = valittuSarja;
+
+    if (asetaUusinOletukseksi && suodatettuData.length > 0) {
+        const uusinRivi = [...suodatettuData].sort((a,b) => a.origIndex - b.origIndex)[0];
+        if (uusinRivi && uusinRivi.sarja) {
+            valittuSarja = uusinRivi.sarja;
+        }
+    }
+
+    if (sarjat.includes(valittuSarja)) {
+        document.getElementById("sarjaSelect").value = valittuSarja;
+    }
 }
 
 function laskeKA(arr) {
@@ -420,7 +429,7 @@ function paivitaNakyma() {
 
     if (nimekkäätAmpujat.length > 0) {
         statsContainer.innerHTML = nimekkäätAmpujat.map((amp, idx) => {
-            // Järjestetään ampuja-aineisto aikajärjestykseen: uusin kisa ensimmäisenä (pienin origIndex)
+            // Uusin kisa on aina ensimmaisena (origIndex 0 -> N)
             const aTuloksetRivit = data.filter(d => d.ampuja === amp).sort((a,b) => a.origIndex - b.origIndex);
             const aTulokset = aTuloksetRivit.map(d => d.tulos);
             
@@ -447,7 +456,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO (Uusin kisa ylimpänä, origIndex 0 -> N)
+    // TAULUKKO (Uusin kisa ylimpana)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = [...data].sort((a,b) => a.origIndex - b.origIndex).map(d => `
         <tr>
@@ -471,13 +480,13 @@ function piirraKaavio(data) {
     const ampujatLista = [...new Set(data.map(d => d.ampuja))];
 
     const datasets = ampujatLista.map((amp, idx) => {
-        // GRAAFI (Vanhin kisa vasemmalla -> suurin origIndex ensin)
+        // GRAAFI (Vanhin kisa vasemmalle -> suurin origIndex ensin, uusin oikealle -> pienin origIndex)
         const ampujaData = data.filter(d => d.ampuja === amp).sort((a, b) => b.origIndex - a.origIndex);
         const vari = variPaletti[idx % variPaletti.length];
         
         return {
             label: amp,
-            data: ampujaData.map((d, i) => {
+            data: ampujaData.map(d => {
                 const pvmTeksti = d.pvm ? `${d.pvm} ` : '';
                 const otsikko = `${pvmTeksti}(${d.kilpailu})`;
                 return {
