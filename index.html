@@ -3,80 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v6.0</title>
+    <title>KITI Tulosvertailu</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
-            --bg: #0f172a;
-            --card-bg: #1e293b;
-            --card-border: #334155;
+            --bg: #0b1329;
+            --card-bg: #162032;
+            --card-border: #26354a;
             --primary: #38bdf8;
             --primary-hover: #0284c7;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --success: #34d399;
             --danger: #f87171;
-            --input-bg: #0f172a;
+            --input-bg: #0b132a;
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; border-radius: 0 !important; }
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background-color: var(--bg); 
             color: var(--text-main); 
             margin: 0; 
-            padding: 16px; 
+            padding: 12px; 
+            font-size: 0.9rem;
         }
 
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1280px; margin: 0 auto; }
 
         header { 
-            background: linear-gradient(135deg, #1e293b, #0f172a); 
+            background: var(--card-bg);
             border: 1px solid var(--card-border);
-            color: var(--text-main); 
-            padding: 24px; 
-            border-radius: 16px; 
-            margin-bottom: 20px; 
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            padding: 12px 16px; 
+            margin-bottom: 12px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        header h1 { margin: 0; font-size: 1.6rem; color: var(--primary); }
-        header p { margin: 6px 0 0 0; color: var(--text-muted); font-size: 0.9rem; }
+        header h1 { margin: 0; font-size: 1.2rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
+        header p { margin: 0; color: var(--text-muted); font-size: 0.8rem; }
 
-        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        @media (min-width: 900px) { .grid { grid-template-columns: 340px 1fr; } }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 900px) { .grid { grid-template-columns: 290px 1fr; } }
 
         .card { 
             background: var(--card-bg); 
-            padding: 20px; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
-            margin-bottom: 20px; 
+            padding: 12px 14px; 
+            margin-bottom: 12px; 
             border: 1px solid var(--card-border); 
         }
 
         h2 { 
-            font-size: 1.05rem; 
-            margin-top: 0; 
+            font-size: 0.85rem; 
+            margin: 0 0 10px 0; 
             color: var(--primary); 
             border-bottom: 1px solid var(--card-border); 
-            padding-bottom: 10px; 
+            padding-bottom: 6px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        label { display: block; margin-top: 14px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+        label { display: block; margin-top: 8px; font-weight: 600; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
 
         select, input { 
             width: 100%; 
-            padding: 12px; 
-            margin-top: 6px; 
+            padding: 7px 10px; 
+            margin-top: 3px; 
             background-color: var(--input-bg);
             border: 1px solid var(--card-border); 
             color: var(--text-main);
-            border-radius: 8px; 
-            font-size: 0.95rem; 
+            font-size: 0.85rem; 
             outline: none;
-            transition: border-color 0.2s;
         }
 
         select:focus, input:focus { border-color: var(--primary); }
@@ -84,61 +82,59 @@
         button { 
             width: 100%; 
             background-color: var(--primary); 
-            color: #0f172a; 
+            color: #0b132a; 
             font-weight: 700; 
             border: none; 
-            padding: 12px; 
-            border-radius: 8px; 
+            padding: 8px 10px; 
+            font-size: 0.85rem;
             cursor: pointer; 
-            margin-top: 16px; 
-            transition: background 0.2s, transform 0.1s; 
+            margin-top: 10px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         button:hover { background-color: var(--primary-hover); color: white; }
-        button:active { transform: scale(0.98); }
 
-        .btn-danger { background-color: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid var(--danger); margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
+        .btn-danger { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); margin: 0; padding: 2px 6px; font-size: 0.7rem; width: auto; }
         .btn-danger:hover { background-color: var(--danger); color: white; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
 
         .stat-box { 
             background: var(--input-bg); 
-            padding: 16px; 
-            border-radius: 12px; 
+            padding: 8px 10px; 
             border: 1px solid var(--card-border); 
         }
 
-        .stat-header { font-size: 0.9rem; font-weight: bold; margin-bottom: 8px; }
+        .stat-header { font-size: 0.8rem; font-weight: bold; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 8px; }
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; background: rgba(255,255,255,0.02); padding: 4px; border: 1px solid var(--card-border); }
         .sub-stat { display: flex; flex-direction: column; }
-        .sub-stat .val { font-weight: bold; font-size: 1.1rem; color: var(--text-main); }
-        .sub-stat .lbl { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+        .sub-stat .val { font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .sub-stat .lbl { font-size: 0.6rem; color: var(--text-muted); margin-top: 1px; }
 
-        .chart-container { position: relative; width: 100%; min-height: 320px; }
+        .chart-container { position: relative; width: 100%; height: 260px; }
 
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; text-align: left; }
-        th, td { padding: 12px 10px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
-        th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 0.8rem; text-align: left; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+        th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
         .ampuja-item { 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
             background: var(--input-bg); 
-            padding: 10px 14px; 
-            border-radius: 8px; 
-            margin-top: 8px; 
+            padding: 6px 8px; 
+            margin-top: 4px; 
             border: 1px solid var(--card-border);
-            font-size: 0.9rem; 
+            font-size: 0.8rem; 
         }
 
-        #statusText { font-size: 0.85rem; color: var(--success); margin-top: 12px; font-weight: 600; text-align: center; word-break: break-word; }
-        .tag { background: #334155; color: var(--text-main); padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; }
-        .tag-laji { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+        #statusText { font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; word-break: break-word; }
+        .tag { background: #26354a; color: var(--text-main); padding: 2px 5px; font-size: 0.7rem; font-weight: 600; display: inline-block; }
+        .tag-laji { background: rgba(56, 189, 248, 0.15); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.3); }
     </style>
 </head>
 <body>
@@ -146,29 +142,28 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Seuraa ja vertaile ammunnan tuloskehitystä lajeittain ja sarjoittain</p>
+        <p>Ampumaurheilun tulos- ja kehitysseuranta</p>
     </header>
 
     <div class="grid">
         <div>
             <div class="card">
-                <h2>Seurattavat Ampujat</h2>
-                
+                <h2>Lisää ampuja</h2>
                 <label for="uusiNimi">Nimi:</label>
                 <input type="text" id="uusiNimi" placeholder="Esim. Matti Meikäläinen">
 
                 <label for="uusiId">Sportti-ID:</label>
                 <input type="text" id="uusiId" placeholder="Esim. 60332562">
 
-                <button onclick="lisaaJaHaeAmpuja()">+ Lisää ja Hae Tulokset</button>
+                <button onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
 
-                <h3 style="font-size: 0.85rem; margin-top: 20px; color: var(--text-muted); text-transform: uppercase;">Tallennetut ampujat:</h3>
+                <label style="margin-top: 14px;">Tallennetut ampujat:</label>
                 <div id="ampujatLista"></div>
             </div>
 
             <div class="card">
-                <h2>Suodatus & Rajaus</h2>
+                <h2>Suodatus</h2>
                 <label for="lajiSelect">Laji:</label>
                 <select id="lajiSelect" onchange="paivitaValikot(false); paivitaNakyma();">
                     <option value="Kaikki">Kaikki lajit</option>
@@ -183,14 +178,14 @@
 
         <div>
             <div class="card">
-                <h2>Ampujakohtaiset Keskiarvot & Trendit</h2>
+                <h2>Keskiarvot & Trendi</h2>
                 <div id="ampujatStats" class="stats-grid"></div>
                 <div class="chart-container">
-                    <canvas id="tulosKaavio" height="150"></canvas>
+                    <canvas id="tulosKaavio"></canvas>
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" style="margin-bottom: 0;">
                 <h2>Tuloshistoria</h2>
                 <div class="table-responsive">
                     <table>
@@ -213,8 +208,7 @@
 </div>
 
 <script>
-// Tyhjennetään selaimen muisti automaattisesti v6.0 johdosta
-const KITI_VERSIO = "v6.0_SMART_DATES";
+const KITI_VERSIO = "v7.0_COMPACT_FLAT";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -264,11 +258,9 @@ function tunnistaSarja(row) {
     return "Muu";
 }
 
-// TÄRKEIN: Tunnistetaan kilpailun todellinen pvm nimen ja rajapintakenttien perusteella
 function tunnistaKisanPaivamaara(row) {
     const nimi = etsiKilpailunNimi(row).toLowerCase();
 
-    // Tunnetut kilpailut ja niiden varmat päivät:
     if (nimi.includes("pohjanmaan am") && nimi.includes("pienoiskivääri")) return "2026-08-15";
     if (nimi.includes("kyröön malja 2026")) return "2026-07-18";
     if (nimi.includes("sm26") || nimi.includes("ilma-aseiden sm")) return "2026-04-10";
@@ -281,7 +273,6 @@ function tunnistaKisanPaivamaara(row) {
     if (nimi.includes("vanhan paukun syyskisat")) return "2025-11-08";
     if (nimi.includes("pyhäinpäiväkilpailut")) return "2025-10-31";
 
-    // Jos ei löydy muistikartasta, haetaan rajapintakentistä
     if (row.competition_start_date) return String(row.competition_start_date).substring(0, 10);
     if (row.start_date) return String(row.start_date).substring(0, 10);
     if (row.competition && typeof row.competition === 'object') {
@@ -301,8 +292,7 @@ async function lisaaJaHaeAmpuja() {
     if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
 
     const statusEl = document.getElementById("statusText");
-    statusEl.style.color = "var(--primary)";
-    statusEl.innerText = `Haetaan tuloksia henkilölle ${nimi}...`;
+    statusEl.innerText = `Haetaan...`;
 
     try {
         const response = await fetch(`/api/kiti?id=${id}&nocache=${Date.now()}`);
@@ -339,8 +329,7 @@ async function lisaaJaHaeAmpuja() {
             tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
-            statusEl.style.color = "var(--success)";
-            statusEl.innerText = `Löytyi ${uudet.length} tulosta!`;
+            statusEl.innerText = `Löytyi ${uudet.length} tulosta.`;
             
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
@@ -348,11 +337,9 @@ async function lisaaJaHaeAmpuja() {
             paivitaValikot(true);
             paivitaNakyma();
         } else {
-            statusEl.style.color = "#fbbf24";
-            statusEl.innerText = "Urheilija löytyi, mutta tulosrivejä ei ollut.";
+            statusEl.innerText = "Ei tuloksia.";
         }
     } catch (e) {
-        statusEl.style.color = "var(--danger)";
         statusEl.innerText = `Virhe: ${e.message}`;
     }
 }
@@ -373,12 +360,12 @@ function poistaAmpuja(index) {
 function paivitaAmpujatLista() {
     const lista = document.getElementById("ampujatLista");
     if (ampujat.length === 0) {
-        lista.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">Ei tallennettuja ampujia.</p>';
+        lista.innerHTML = '<p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0;">Ei tallennettuja ampujia.</p>';
         return;
     }
     lista.innerHTML = ampujat.map((a, i) => `
         <div class="ampuja-item">
-            <span><b>${a.nimi}</b> <span style="font-size:0.75rem; color:var(--text-muted);">(ID: ${a.id})</span></span>
+            <span><b>${a.nimi}</b> <span style="font-size:0.7rem; color:var(--text-muted);">(ID: ${a.id})</span></span>
             <button class="btn-danger" onclick="poistaAmpuja(${i})">Poista</button>
         </div>
     `).join("");
@@ -446,22 +433,21 @@ function paivitaNakyma() {
             const max = Math.max(...aTulokset);
             const vari = variPaletti[idx % variPaletti.length];
             return `
-                <div class="stat-box" style="border-top: 4px solid ${vari};">
-                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aTulokset.length} kisaa | Paras: ${max})</span></div>
+                <div class="stat-box" style="border-top: 2px solid ${vari};">
+                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(${aTulokset.length} kisaa | Paras: ${max})</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
-                        <div class="sub-stat"><span class="val">${kaV5}</span><span class="lbl">V5 KISAA</span></div>
-                        <div class="sub-stat"><span class="val">${kaV10}</span><span class="lbl">V10 KISAA</span></div>
-                        <div class="sub-stat"><span class="val">${kaV15}</span><span class="lbl">V15 KISAA</span></div>
+                        <div class="sub-stat"><span class="val">${kaV5}</span><span class="lbl">V5</span></div>
+                        <div class="sub-stat"><span class="val">${kaV10}</span><span class="lbl">V10</span></div>
+                        <div class="sub-stat"><span class="val">${kaV15}</span><span class="lbl">V15</span></div>
                     </div>
                 </div>
             `;
         }).join("");
     } else {
-        statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
+        statsContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); padding:4px;">Ei tuloksia.</div>';
     }
 
-    // TAULUKKO (Uusin kisa ylimpänä täsmällisen päivämäärän mukaan)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
@@ -485,7 +471,6 @@ function piirraKaavio(data) {
     const ampujatLista = [...new Set(data.map(d => d.ampuja))];
 
     const datasets = ampujatLista.map((amp, idx) => {
-        // GRAAFI (Vanhin kisa vasemmalla -> Uusin oikealla)
         const ampujaData = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), false);
         const vari = variPaletti[idx % variPaletti.length];
         
@@ -497,10 +482,10 @@ function piirraKaavio(data) {
             })),
             borderColor: vari,
             backgroundColor: vari,
-            borderWidth: 2,
-            tension: 0.2,
-            pointRadius: 5,
-            pointHoverRadius: 8
+            borderWidth: 1.5,
+            tension: 0.1,
+            pointRadius: 4,
+            pointHoverRadius: 6
         };
     });
 
@@ -514,7 +499,7 @@ function piirraKaavio(data) {
                 legend: { 
                     display: true, 
                     position: 'top',
-                    labels: { color: '#f8fafc' }
+                    labels: { color: '#f8fafc', boxWidth: 12, font: { size: 11 } }
                 },
                 tooltip: {
                     callbacks: {
@@ -531,13 +516,13 @@ function piirraKaavio(data) {
                         color: '#94a3b8',
                         maxRotation: 45,
                         minRotation: 45,
-                        font: { size: 10 }
+                        font: { size: 9 }
                     },
-                    grid: { color: '#334155' }
+                    grid: { color: '#162032' }
                 },
                 y: {
-                    ticks: { color: '#94a3b8' },
-                    grid: { color: '#334155' }
+                    ticks: { color: '#94a3b8', font: { size: 10 } },
+                    grid: { color: '#162032' }
                 }
             }
         }
