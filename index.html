@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v73.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v75.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v73.0_STRICT_FILTER";
+const KITI_VERSIO = "v75.0_ALL_DISciplines";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -433,25 +433,33 @@ function tunnistaLaji(row) {
     const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
     const tVal = parseFloat(String(row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0))).replace(",", "."));
 
-    if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) {
-        return "Ilmakivääri";
-    }
-    
-    if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        const onAsentoNimessa = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
-        
-        if (tVal > 800 || (onAsentoNimessa && tVal > 700)) {
-            return "Pienoiskivääri 3x20/3x40 (Asento)";
-        }
-        return "Pienoiskivääri Makuu";
-    }
+    // Haulikkolajit
+    if (txt.includes("skeet") || kisaNimi.includes("skeet")) return "Skeet";
+    if (txt.includes("trap") || kisaNimi.includes("trap")) return "Trap";
+    if (txt.includes("compak") || kisaNimi.includes("sporting")) return "Compak Sporting";
+    if (txt.includes("haulikko") || kisaNimi.includes("haulikko")) return "Haulikko";
 
+    // Pistoolilajit
     if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
-    if (txt.includes("pistooli")) return "Pistooli";
-    
-    if (txt.includes("kivääri")) {
-        return (tVal > 800) ? "Kivääri 3x20/3x40 (Asento)" : "Kivääri Makuu";
+    if (txt.includes("vapaapistooli") || txt.includes("vapaa-pistooli")) return "Vapaapistooli";
+    if (txt.includes("pienoispistooli") || txt.includes("pienois-pistooli")) return "Pienoispistooli";
+    if (txt.includes("isopistooli") || txt.includes("iso-pistooli")) return "Isopistooli";
+    if (txt.includes("olympiapistooli")) return "Olympiapistooli";
+    if (txt.includes("pika")) return "Pikapistooli";
+    if (txt.includes("vakiopistooli")) return "Vakiopistooli";
+    if (txt.includes("roiskelyönti") || txt.includes("ilmahammastus")) return "Pistoolilaji";
+    if (txt.includes("pistooli") || kisaNimi.includes("pistooli")) return "Pistooli (Muu)";
+
+    // Kiväärilajit
+    if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) return "Ilmakivääri";
+    if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
+        const onAsento = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
+        return onAsento ? "Pienoiskivääri Asento (3x20/3x40)" : "Pienoiskivääri Makuu";
     }
+    if (txt.includes("vapaakivääri")) return "Vapaakivääri";
+    if (txt.includes("300m") || kisaNimi.includes("300m")) return "Kivääri 300m";
+    if (txt.includes("metsästys") || txt.includes("hirvi") || txt.includes("luodikko") || kisaNimi.includes("hirvi") || kisaNimi.includes("metsästys")) return "Metsästysammunta";
+    if (txt.includes("kivääri") || kisaNimi.includes("kivääri")) return (tVal > 800) ? "Kivääri Asento" : "Kivääri Makuu";
 
     return row.eventName || row.sportName || row.sport || "Muu laji";
 }
@@ -621,11 +629,9 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const valittuLaji = lajiSelect.value;
     let valittuSarja = sarjaSelect.value;
 
-    // Vain aktiivisten ampujien data huomioidaan
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
     const aktiivinenData = tulosData.filter(d => aktiivisetAmpujatNimet.includes(d.ampuja));
 
-    // Laji-valikko: vain sellaiset lajit, joita valitut ampujat ovat ampuneet
     const lajit = ["Kaikki", ...new Set(aktiivinenData.map(d => d.laji))];
     lajiSelect.innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
 
@@ -643,7 +649,6 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const aktiivinenLaji = lajiSelect.value;
     const suodatettuDataLajinMukaan = aktiivinenData.filter(d => aktiivinenLaji === "Kaikki" || d.laji === aktiivinenLaji);
     
-    // Sarja-valikko: vain sellaiset sarjat, jotka kuuluvat valittujen ampujien tuloksiin / aktiiviseen lajiin
     const sarjat = ["Kaikki", ...new Set(suodatettuDataLajinMukaan.map(d => d.sarja))];
     sarjaSelect.innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
 
