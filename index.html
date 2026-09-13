@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v31.0</title>
+    <title>KITI Tulosvertailu v32.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -291,7 +291,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v31.0_DYNAMIC_RANK_FETCH";
+const KITI_VERSIO = "v32.0_BRUTE_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -317,12 +317,12 @@ function alusta() {
     });
 }
 
-// Hakee dynaamisesti KITI:n tilastoista sijoituksen käyttäen ampujan omista tuloksista poimittua lajia ja sarjaa
+// "Raaka" haku: selaa 10 sivua (250 sijaa) ja etsii ID:tä pelkkänä tekstinä rajapinnan datasta!
 async function haeAutomaattinenSijoitus(sporttiId, sportId, categoryId) {
     try {
-        const levels = "8,10,11"; // Oletustasot, kuten annoit URL:ssa
-        // Selaillaan ensimmäiset 4 sivua (max 100 tulosta)
-        for (let page = 1; page <= 4; page++) {
+        const levels = "8,10,11"; // Oletustasot 
+        
+        for (let page = 1; page <= 10; page++) {
             const url = `/api/resultlist/?category=${categoryId}&fields!=partial&level=${levels}&limit=25&page=${page}&sport=${sportId}&type=1&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
@@ -332,9 +332,12 @@ async function haeAutomaattinenSijoitus(sporttiId, sportId, categoryId) {
             if (rows.length === 0) break;
 
             for (let r of rows) {
-                const idKentta = String(r.sportti_id || r.shooter_id || r.competitor_id || (r.shooter && r.shooter.id) || (r.competitor && r.competitor.id) || "");
-                if (idKentta === String(sporttiId)) {
-                    let sijoitus = r.place || r.rank || r.position;
+                // RAAKAHAKU: Muutetaan koko rivin data tekstiksi ja katsotaan onko Sportti-ID jossain siellä!
+                const riviTekstina = JSON.stringify(r);
+                if (riviTekstina.includes(String(sporttiId))) {
+                    console.log("KITI Automaattihaku osuma! Data:", r);
+                    
+                    let sijoitus = r.place || r.rank || r.position || r.sijoitus || "";
                     if (sijoitus) {
                         const ampujaObj = ampujat.find(a => String(a.id) === String(sporttiId));
                         if (ampujaObj) {
@@ -342,14 +345,15 @@ async function haeAutomaattinenSijoitus(sporttiId, sportId, categoryId) {
                             localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
                             paivitaNakyma();
                             paivitaAmpujatLista();
+                            console.log("Tallennettiin sijoitus:", sijoitus);
                         }
-                        return;
+                        return; // Osuma löytyi, lopetetaan haku
                     }
                 }
             }
         }
     } catch (e) {
-        // Hiljainen virheenkäsittely
+        console.error("Automaattinen sijoituksen haku epäonnistui:", e);
     }
 }
 
@@ -509,7 +513,7 @@ async function lisaaJaHaeAmpuja() {
 
             // Laitetaan sijoitushaku käyntiin taustalla, jos sijoitusta ei annettu käsin
             if (!lopullinenSijoitus || lopullinenSijoitus === "-") {
-                statusEl.innerText = `Löytyi ${uudet.length} tulosta! Etsitään sijoitusta...`;
+                statusEl.innerText = `Löytyi ${uudet.length} tulosta! Etsitään sijoitusta (odota hetki)...`;
                 haeAutomaattinenSijoitus(id, autoSportId, autoCategoryId).then(() => {
                     statusEl.innerText = `Löytyi ${uudet.length} tulosta! Valmis.`;
                 });
