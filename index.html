@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v69.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v70.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v69.0_TITLE_UPDATE";
+const KITI_VERSIO = "v70.0_FILTER_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -566,6 +566,7 @@ async function lisaaJaHaeAmpuja() {
 function vaihdaAmpujanTila(index, state) {
     ampujat[index].aktiivinen = state;
     localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
+    paivitaValikot(false);
     paivitaNakyma();
 }
 
@@ -620,33 +621,40 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const valittuLaji = lajiSelect.value;
     let valittuSarja = sarjaSelect.value;
 
-    const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
+    // Vain aktiivisten ampujien data otetaan huomioon valikoiden täytössä
+    const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
+    const aktiivinenData = tulosData.filter(d => aktiivisetAmpujatNimet.includes(d.ampuja));
+
+    const lajit = ["Kaikki", ...new Set(aktiivinenData.map(d => d.laji))];
     lajiSelect.innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
 
-    if (asetaUusinOletukseksi && tulosData.length > 0) {
-        const uusinRivi = jarjestaPvmMukaan(tulosData, true)[0];
-        if (uusinRivi) {
-            if (lajit.includes(uusinRivi.laji)) {
-                lajiSelect.value = uusinRivi.laji;
-            }
-            valittuSarja = uusinRivi.sarja;
+    if (asetaUusinOletukseksi && aktiivinenData.length > 0) {
+        const uusinRivi = jarjestaPvmMukaan(aktiivinenData, true)[0];
+        if (uusinRivi && lajit.includes(uusinRivi.laji)) {
+            lajiSelect.value = uusinRivi.laji;
         }
     } else if (lajit.includes(valittuLaji)) {
         lajiSelect.value = valittuLaji;
+    } else {
+        lajiSelect.value = "Kaikki";
     }
 
     const aktiivinenLaji = lajiSelect.value;
-    const suodatettuData = tulosData.filter(d => aktiivinenLaji === "Kaikki" || d.laji === aktiivinenLaji);
-    const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
+    const suodatettuDataLajinMukaan = aktiivinenData.filter(d => aktiivinenLaji === "Kaikki" || d.laji === aktiivinenLaji);
+    
+    // Näytetään sarjavalikossa VAIN niiden aktiivisten ampujien sarjat, jotka kuuluvat kyseiseen lajiin
+    const sarjat = ["Kaikki", ...new Set(suodatettuDataLajinMukaan.map(d => d.sarja))];
     sarjaSelect.innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
 
     if (sarjat.includes(valittuSarja)) {
         sarjaSelect.value = valittuSarja;
-    } else if (asetaUusinOletukseksi && suodatettuData.length > 0) {
-        const uusinRivi = jarjestaPvmMukaan(suodatettuData, true)[0];
+    } else if (asetaUusinOletukseksi && suodatettuDataLajinMukaan.length > 0) {
+        const uusinRivi = jarjestaPvmMukaan(suodatettuDataLajinMukaan, true)[0];
         if (uusinRivi && sarjat.includes(uusinRivi.sarja)) {
             sarjaSelect.value = uusinRivi.sarja;
         }
+    } else {
+        sarjaSelect.value = "Kaikki";
     }
 }
 
