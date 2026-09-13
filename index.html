@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v85.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v87.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v85.0_NESTED_COMPETITION_FIX";
+const KITI_VERSIO = "v87.0_EXACT_TYPE_INFO_NAME";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -416,98 +416,62 @@ function asetaTeema(teema) {
 }
 
 function etsiKilpailunNimi(row) {
-    if (row.competition_name) return String(row.competition_name);
-    if (row.competitionName) return String(row.competitionName);
-    if (row.name) return String(row.name);
-    
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
         if (c.name) return String(c.name);
         if (c.competition_name) return String(c.competition_name);
         if (c.title) return String(c.title);
     }
+    if (row.competition_name) return String(row.competition_name);
+    if (row.competitionName) return String(row.competitionName);
+    if (row.name) return String(row.name);
     return "Kilpailu";
 }
 
-function puraTekstiksi(arvo) {
-    if (arvo === undefined || arvo === null) return "";
-    if (typeof arvo === 'object') {
-        return String(arvo.name || arvo.title || arvo.code || arvo.text || arvo.value || "").trim();
-    }
-    return String(arvo).trim();
-}
-
 function lueLaji(row) {
-    // 1. Tarkistetaan suorat pääkentät
-    const paakentat = [
-        row.type,
-        row.disciplineName,
-        row.discipline_name,
-        row.sportName,
-        row.sport_name,
-        row.eventName,
-        row.event_name,
-        row.discipline,
-        row.sport
-    ];
-    for (const k of paakentat) {
-        const tulos = puraTekstiksi(k);
-        if (tulos.length > 0) return tulos;
-    }
-
-    // 2. Tarkistetaan kilpailu-olion sisään pesiytyneet kentät (row.competition)
+    // Luetaan tarkasti competition.type_info.name kuten kuvassa 7 näkyy
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
-        const alikentat = [c.type, c.disciplineName, c.discipline_name, c.sportName, c.sport_name, c.eventName, c.event_name, c.discipline, c.sport];
-        for (const k of alikentat) {
-            const tulos = puraTekstiksi(k);
-            if (tulos.length > 0) return tulos;
+        if (c.type_info && typeof c.type_info === 'object' && c.type_info.name) {
+            return String(c.type_info.name).trim();
         }
     }
-
-    // 3. Viimeisenä turvana etsitään josko jokin kenttä rivillä sisältäisi tuttuja lajitermejä
-    const jsonStr = JSON.stringify(row).toLowerCase();
-    if (jsonStr.includes("isopistooli")) return "25m isopistooli";
-    if (jsonStr.includes("vakiopistooli")) return "25m vakiopistooli";
-    if (jsonStr.includes("pienoispistooli")) return "25m pistooli";
-    if (jsonStr.includes("50m pistooli") || jsonStr.includes("vapaapistooli")) return "50m pistooli";
-    if (jsonStr.includes("ilmapistooli")) return "10m ilmapistooli";
-    if (jsonStr.includes("ilmakivääri")) return "Ilmakivääri";
-
+    // Varakentät, jos tyyppitietoa ei löydy type_info:sta
+    const mahdolliset = [row.type, row.disciplineName, row.sportName];
+    for (const m of mahdolliset) {
+        if (m) {
+            if (typeof m === 'object' && m.name) return String(m.name).trim();
+            if (typeof m === 'string' && m.trim().length > 0) return m.trim();
+        }
+    }
     return "Muu laji";
 }
 
 function lueSarja(row) {
-    const kentat = [
-        row.category,
-        row.series,
-        row.className,
-        row.class_name,
-        row.category_code
-    ];
-
-    for (const k of kentat) {
-        const tulos = puraTekstiksi(k);
-        if (tulos.length > 0) return tulos;
+    if (row.category !== undefined && row.category !== null) {
+        if (typeof row.category === 'object') {
+            return String(row.category.name || row.category.code || "Muu").trim();
+        }
+        return String(row.category).trim();
     }
-
+    if (row.series !== undefined) return String(row.series).trim();
+    
     if (row.competition && typeof row.competition === 'object') {
-        const tulos = puraTekstiksi(row.competition.category || row.competition.series);
-        if (tulos.length > 0) return tulos;
+        const c = row.competition;
+        if (c.category) return String(c.category).trim();
     }
-
     return "Muu";
 }
 
 function tunnistaKisanPaivamaara(row) {
     let pvm = "";
-    if (row.competition_start_date) pvm = row.competition_start_date;
-    else if (row.start_date) pvm = row.start_date;
-    else if (row.competition && typeof row.competition === 'object') {
+    if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
-        pvm = c.start_date || c.competition_start_date || c.date || "";
+        pvm = c.date_start || c.start_date || c.competition_start_date || c.date || "";
     }
-    else if (row.date) pvm = row.date;
+    if (!pvm) {
+        pvm = row.competition_start_date || row.start_date || row.date_start || row.date || "";
+    }
 
     if (pvm) return String(pvm).substring(0, 10);
 
