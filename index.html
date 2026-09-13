@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v26.0</title>
+    <title>KITI Tulosvertailu v27.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -139,10 +139,10 @@
 
         .stat-header { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; text-align: center; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
         .sub-stat { display: flex; flex-direction: column; cursor: help; }
-        .sub-stat .val { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
-        .sub-stat .lbl { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
+        .sub-stat .val { font-weight: 800; font-size: 0.9rem; color: var(--text-main); }
+        .sub-stat .lbl { font-size: 0.5rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
 
         .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
         .extra-stats > div { cursor: help; }
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v26.0_NAME_AND_STATS";
+const KITI_VERSIO = "v27.0_CURRENT_FORM";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -526,7 +526,7 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     } else if (asetaUusinOletukseksi && suodatettuData.length > 0) {
         const uusinRivi = jarjestaPvmMukaan(suodatettuData, true)[0];
         if (uusinRivi && sarjat.includes(uusinRivi.sarja)) {
-            sarjaSelect.value = uusinRivi.sarja;
+            sarjaSelect.value = uusinvRivi.sarja;
         }
     }
 }
@@ -534,6 +534,20 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
 function laskeKA(arr) {
     if (!arr || arr.length === 0) return "-";
     return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+}
+
+// Laskee viimeisen 5 kisan keskiarvon josta on poistettu paras ja heikoin tulos
+function laskeKisakunto(arr) {
+    if (!arr || arr.length === 0) return "-";
+    const viisi = arr.slice(0, 5);
+    if (viisi.length <= 2) {
+        return laskeKA(viisi); // Jos kisoja on liian vähän ääripäiden pudottamiseen, näytetään normaali ka
+    }
+    const kopio = [...viisi].sort((a, b) => a - b);
+    kopio.shift(); // poistetaan matalin
+    kopio.pop();   // poistetaan korkein
+    if (kopio.length === 0) return laskeKA(viisi);
+    return (kopio.reduce((a, b) => a + b, 0) / kopio.length).toFixed(1);
 }
 
 function laskeHajonta(arr) {
@@ -579,11 +593,13 @@ function paivitaNakyma() {
             const aTuloksetRajatut = aRivitRajattu.map(d => d.tulos);
             
             const kaValitut = laskeKA(aTuloksetRajatut);
+            const kisakunto = laskeKisakunto(aTuloksetRajatut);
             const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
             const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
 
             const lbl1 = maaraValinta === "kaikki" ? "Valitut (Kaikki)" : `Valitut (${aRivitRajattu.length} kpl)`;
+            const lblKisakunto = "Tämänhetkinen kisakunto";
             const lbl2 = "Viimeiset 3";
             const lbl3 = "Viimeiset 5";
             const lbl4 = "Viimeiset 10";
@@ -606,6 +622,7 @@ function paivitaNakyma() {
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
+                        <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
                         <div class="sub-stat" title="Viimeisen 5 kilpailun keskiarvo"><span class="val">${kaV5}</span><span class="lbl">${lbl3}</span></div>
                         <div class="sub-stat" title="Viimeisen 10 kilpailun keskiarvo"><span class="val">${kaV10}</span><span class="lbl">${lbl4}</span></div>
