@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v16.0</title>
+    <title>KITI Tulosvertailu v17.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -128,7 +128,7 @@
         }
         .btn-danger:hover { background-color: var(--danger); color: white; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 20px; }
 
         .stat-box { 
             background: var(--input-bg); 
@@ -144,8 +144,8 @@
         .sub-stat .val { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
         .sub-stat .lbl { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
 
-        .extra-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
-        .extra-stats b { color: var(--text-main); display: block; font-size: 0.85rem; }
+        .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats b { color: var(--text-main); display: block; font-size: 0.8rem; }
 
         .chart-container { position: relative; width: 100%; height: 320px; }
 
@@ -279,7 +279,8 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v16.0_MAKUU_FIX";
+// Pakotetaan uusin versio, joka nollaa vanhat virheelliset välimuistitulokset
+const KITI_VERSIO = "v17.0_FINAL_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -294,7 +295,7 @@ const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 function alusta() {
     ampujat.forEach(a => { if (a.aktiivinen === undefined) a.aktiivinen = true; });
     paivitaAmpujatLista();
-    paivitaValikot(true);
+    paivitaValikot(true); // Asetetaan tuorein laji/sarja oletukseksi
     paivitaNakyma();
 }
 
@@ -322,7 +323,7 @@ function tunnistaLaji(row) {
     
     // Tarkistetaan pienoiskivääri / 50m / 300m
     if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        // Vain jos tulos on yli 800 TAI nimenomaisesti mainitaan asento/3x, kyseessä on asento. Muuten se on makuu.
+        // Vain jos tulos on yli 800 TAI nimenomaisesti mainitaan asento/3x/40, kyseessä on asento. Muuten makuu.
         const onAsentoNimessa = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
         
         if (tVal > 800 || (onAsentoNimessa && tVal > 700)) {
@@ -423,7 +424,7 @@ async function lisaaJaHaeAmpuja() {
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
             paivitaAmpujatLista();
-            paivitaValikot(true);
+            paivitaValikot(true); // Asetetaan tuoreimmat oletukseksi
             paivitaNakyma();
         } else {
             statusEl.innerText = "Ei tuloksia.";
@@ -484,26 +485,40 @@ function jarjestaPvmMukaan(dataArr, uusinEnsin = true) {
 }
 
 function paivitaValikot(asetaUusinOletukseksi = false) {
-    const valittuLaji = document.getElementById("lajiSelect").value;
-    let valittuSarja = document.getElementById("sarjaSelect").value;
+    const lajiSelect = document.getElementById("lajiSelect");
+    const sarjaSelect = document.getElementById("sarjaSelect");
+
+    const valittuLaji = lajiSelect.value;
+    let valittuSarja = sarjaSelect.value;
 
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
-    document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
-    if (lajit.includes(valittuLaji)) document.getElementById("lajiSelect").value = valittuLaji;
+    lajiSelect.innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
 
-    const suodatettuData = tulosData.filter(d => valittuLaji === "Kaikki" || d.laji === valittuLaji);
-    const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
-    document.getElementById("sarjaSelect").innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
-
-    if (asetaUusinOletukseksi && suodatettuData.length > 0) {
-        const uusinRivi = jarjestaPvmMukaan(suodatettuData, true)[0];
-        if (uusinRivi && uusinRivi.sarja) {
+    // Jos pyydetään (esim. sivun alussa tai uuden haun jälkeen), asetetaan oletukseksi viimeisin laji ja sarja
+    if (asetaUusinOletukseksi && tulosData.length > 0) {
+        const uusinRivi = jarjestaPvmMukaan(tulosData, true)[0];
+        if (uusinRivi) {
+            if (lajit.includes(uusinRivi.laji)) {
+                lajiSelect.value = uusinRivi.laji;
+            }
             valittuSarja = uusinRivi.sarja;
         }
+    } else if (lajit.includes(valittuLaji)) {
+        lajiSelect.value = valittuLaji;
     }
 
+    const aktiivinenLaji = lajiSelect.value;
+    const suodatettuData = tulosData.filter(d => aktiivinenLaji === "Kaikki" || d.laji === aktiivinenLaji);
+    const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
+    sarjaSelect.innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
+
     if (sarjat.includes(valittuSarja)) {
-        document.getElementById("sarjaSelect").value = valittuSarja;
+        sarjaSelect.value = valittuSarja;
+    } else if (asetaUusinOletukseksi && suodatettuData.length > 0) {
+        const uusinRivi = jarjestaPvmMukaan(suodatettuData, true)[0];
+        if (uusinRivi && sarjat.includes(uusinRivi.sarja)) {
+            sarjaSelect.value = uusinRivi.sarja;
+        }
     }
 }
 
@@ -553,9 +568,11 @@ function paivitaNakyma() {
 
             const pb = aTulokset.length > 0 ? Math.max(...aTulokset) : "-";
             
+            // Kauden paras (SB) ja heikoin (WS)
             const nykyVuosi = new Date().getFullYear().toString();
             const kaudenTulokset = aTuloksetRivit.filter(d => d.pvm.startsWith(nykyVuosi)).map(d => d.tulos);
             const sb = kaudenTulokset.length > 0 ? Math.max(...kaudenTulokset) : pb;
+            const ws = kaudenTulokset.length > 0 ? Math.min(...kaudenTulokset) : (aTulokset.length > 0 ? Math.min(...aTulokset) : "-");
 
             let trendiTxt = "-";
             if (aTulokset.length >= 2) {
@@ -578,6 +595,7 @@ function paivitaNakyma() {
                     <div class="extra-stats">
                         <div>Ennätys (PB)<b>${pb}</b></div>
                         <div>Kauden paras<b>${sb}</b></div>
+                        <div>Kauden heikoin<b>${ws}</b></div>
                         <div>Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
                 </div>
