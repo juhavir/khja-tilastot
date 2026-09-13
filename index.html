@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v17.0</title>
+    <title>KITI Tulosvertailu v18.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -239,6 +239,14 @@
                 <select id="sarjaSelect" onchange="paivitaNakyma();">
                     <option value="Kaikki">Kaikki sarjat</option>
                 </select>
+
+                <label for="maaraSelect">Kilpailujen määrä</label>
+                <select id="maaraSelect" onchange="paivitaNakyma();">
+                    <option value="kaikki" selected>Kaikki kisat</option>
+                    <option value="3">Viimeiset 3 kilpailua</option>
+                    <option value="5">Viimeiset 5 kilpailua</option>
+                    <option value="10">Viimeiset 10 kilpailua</option>
+                </select>
             </div>
         </div>
 
@@ -279,8 +287,7 @@
 </div>
 
 <script>
-// Pakotetaan uusin versio, joka nollaa vanhat virheelliset välimuistitulokset
-const KITI_VERSIO = "v17.0_FINAL_FIX";
+const KITI_VERSIO = "v18.0_FILTER_COUNT";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -295,7 +302,7 @@ const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 function alusta() {
     ampujat.forEach(a => { if (a.aktiivinen === undefined) a.aktiivinen = true; });
     paivitaAmpujatLista();
-    paivitaValikot(true); // Asetetaan tuorein laji/sarja oletukseksi
+    paivitaValikot(true);
     paivitaNakyma();
 }
 
@@ -321,9 +328,7 @@ function tunnistaLaji(row) {
         return "Ilmakivääri";
     }
     
-    // Tarkistetaan pienoiskivääri / 50m / 300m
     if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        // Vain jos tulos on yli 800 TAI nimenomaisesti mainitaan asento/3x/40, kyseessä on asento. Muuten makuu.
         const onAsentoNimessa = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
         
         if (tVal > 800 || (onAsentoNimessa && tVal > 700)) {
@@ -424,7 +429,7 @@ async function lisaaJaHaeAmpuja() {
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
             paivitaAmpujatLista();
-            paivitaValikot(true); // Asetetaan tuoreimmat oletukseksi
+            paivitaValikot(true);
             paivitaNakyma();
         } else {
             statusEl.innerText = "Ei tuloksia.";
@@ -494,7 +499,6 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
     lajiSelect.innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
 
-    // Jos pyydetään (esim. sivun alussa tai uuden haun jälkeen), asetetaan oletukseksi viimeisin laji ja sarja
     if (asetaUusinOletukseksi && tulosData.length > 0) {
         const uusinRivi = jarjestaPvmMukaan(tulosData, true)[0];
         if (uusinRivi) {
@@ -537,6 +541,7 @@ function laskeHajonta(arr) {
 function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
+    const maaraValinta = document.getElementById("maaraSelect").value;
     const infoEl = document.getElementById("vertailuIlmoitus");
 
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
@@ -548,6 +553,7 @@ function paivitaNakyma() {
         infoEl.style.display = "none";
     }
 
+    // Perussuodatus lajille ja sarjalle
     let data = tulosData.filter(d => 
         aktiivisetAmpujatNimet.includes(d.ampuja) &&
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
@@ -558,34 +564,42 @@ function paivitaNakyma() {
 
     if (aktiivisetAmpujatNimet.length > 0) {
         statsContainer.innerHTML = aktiivisetAmpujatNimet.map((amp, idx) => {
-            const aTuloksetRivit = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
-            const aTulokset = aTuloksetRivit.map(d => d.tulos);
+            // Haetaan ampujan omat tulokset aikajärjestyksessä (uusin ensin)
+            const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
             
-            const kaKaikki = laskeKA(aTulokset);
-            const kaV5 = laskeKA(aTulokset.slice(0, 5));
-            const kaV10 = laskeKA(aTulokset.slice(0, 10));
-            const kaV15 = laskeKA(aTulokset.slice(0, 15));
+            // Rajataan kilpailujen määrän mukaan (3, 5, 10 tai kaikki)
+            let aRivitRajattu = aRivitKaikki;
+            if (maaraValinta !== "kaikki") {
+                const rajoitus = parseInt(maaraValinta, 10);
+                aRivitRajattu = aRivitKaikki.slice(0, rajoitus);
+            }
 
-            const pb = aTulokset.length > 0 ? Math.max(...aTulokset) : "-";
+            const aTuloksetRajatut = aRivitRajattu.map(d => d.tulos);
             
-            // Kauden paras (SB) ja heikoin (WS)
+            const kaKaikki = laskeKA(aTuloksetRajatut);
+            const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
+            const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
+            const kaV15 = laskeKA(aTuloksetRajatut.slice(0, 15));
+
+            const pb = aRivitKaikki.length > 0 ? Math.max(...aRivitKaikki.map(d => d.tulos)) : "-";
+            
             const nykyVuosi = new Date().getFullYear().toString();
-            const kaudenTulokset = aTuloksetRivit.filter(d => d.pvm.startsWith(nykyVuosi)).map(d => d.tulos);
+            const kaudenTulokset = aRivitKaikki.filter(d => d.pvm.startsWith(nykyVuosi)).map(d => d.tulos);
             const sb = kaudenTulokset.length > 0 ? Math.max(...kaudenTulokset) : pb;
-            const ws = kaudenTulokset.length > 0 ? Math.min(...kaudenTulokset) : (aTulokset.length > 0 ? Math.min(...aTulokset) : "-");
+            const ws = kaudenTulokset.length > 0 ? Math.min(...kaudenTulokset) : (aRivitKaikki.length > 0 ? Math.min(...aRivitKaikki.map(d => d.tulos)) : "-");
 
             let trendiTxt = "-";
-            if (aTulokset.length >= 2) {
-                const ero = (aTulokset[0] - aTulokset[1]).toFixed(1);
+            if (aRivitRajattu.length >= 2) {
+                const ero = (aRivitRajattu[0].tulos - aRivitRajattu[1].tulos).toFixed(1);
                 trendiTxt = ero > 0 ? `+${ero}` : `${ero}`;
             }
 
-            const hajonta = laskeHajonta(aTulokset);
+            const hajonta = laskeHajonta(aTuloksetRajatut);
             const vari = variPaletti[idx % variPaletti.length];
 
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
-                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aTulokset.length} kisaa)</span></div>
+                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
                         <div class="sub-stat"><span class="val">${kaV5}</span><span class="lbl">V5</span></div>
@@ -605,8 +619,21 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:8px;">Ei aktiivisia ampujia valittuna.</div>';
     }
 
+    // Taulukkoon näytetään rajatut tai kaikki tiedot valinnan mukaan
+    let taulukkoData = data;
+    if (maaraValinta !== "kaikki") {
+        const rajoitus = parseInt(maaraValinta, 10);
+        // Otetaan jokaiselta aktiiviselta ampujalta vain N viimeisintä
+        let ryhmitetty = [];
+        aktiivisetAmpujatNimet.forEach(amp => {
+            const ampujaRivit = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true).slice(0, rajoitus);
+            ryhmitetty.push(...ampujaRivit);
+        });
+        taulukkoData = ryhmitetty;
+    }
+
     const tbody = document.getElementById("tulosTaulukko");
-    tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
+    tbody.innerHTML = jarjestaPvmMukaan(taulukkoData, true).map((d) => `
         <tr>
             <td><b>${d.pvm}</b></td>
             <td style="color: var(--text-muted);">${d.kilpailu}</td>
@@ -617,7 +644,7 @@ function paivitaNakyma() {
         </tr>
     `).join("");
 
-    piirraKaavio(data);
+    piirraKaavio(taulukkoData);
 }
 
 function piirraKaavio(data) {
