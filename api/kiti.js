@@ -39,8 +39,8 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}.` });
         }
 
-        // Haetaan tulokset suoraan KITI:n omalla tuoreusjärjestyksellä
-        const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition_start_date`;
+        // Haetaan tulokset pakottaen KITI-rajapinta järjestämään kisan alkamispäivämäärän mukaan
+        const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition__start_date`;
         const resultsRes = await fetch(resultsUrl, { headers });
 
         if (!resultsRes.ok) {
@@ -50,7 +50,24 @@ export default async function handler(req, res) {
         const resultsData = await resultsRes.json();
         const rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
 
-        return res.status(200).json(rows);
+        // Poimitaan kunkin kilpailun aito kisa-alkamispäivämäärä KITI-oliosta
+        const formatoidutRows = rows.map(row => {
+            let pvm = "";
+            
+            if (row.competition && typeof row.competition === 'object') {
+                pvm = row.competition.start_date || row.competition.startDate || row.competition.date || "";
+            }
+            if (!pvm) {
+                pvm = row.competition_start_date || row.competitionStartDate || row.start_date || row.startDate || row.date || "";
+            }
+
+            return {
+                ...row,
+                todellinen_pvm: String(pvm).substring(0, 10)
+            };
+        });
+
+        return res.status(200).json(formatoidutRows);
 
     } catch (error) {
         return res.status(500).json({ error: `Palvelinvirhe: ${error.message}` });
