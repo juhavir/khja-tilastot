@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v28.0</title>
+    <title>KITI Tulosvertailu v30.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -219,6 +219,9 @@
                 <label for="uusiId" style="margin-top: 10px;">Sportti-ID</label>
                 <input type="text" id="uusiId" placeholder="Esim. 29364659">
 
+                <label for="uusiSijoitus" style="margin-top: 10px;">Paras sijoitus (valinnainen / korjaus)</label>
+                <input type="text" id="uusiSijoitus" placeholder="Haetaan automaattisesti tai laita käsin">
+
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
 
@@ -288,7 +291,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v28.0_RANKING";
+const KITI_VERSIO = "v30.0_AUTO_RANK_FETCH";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -296,7 +299,6 @@ if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
 
 let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
-let rankingCache = JSON.parse(localStorage.getItem("kiti_ranking")) || {}; // Tallennetaan haetut sijoitukset
 let myChart = null;
 
 const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
@@ -307,38 +309,43 @@ function alusta() {
     paivitaValikot(true);
     paivitaNakyma();
     
-    // Haetaan taustalla sijoitukset niille ampujille, joilta se puuttuu
+    // Haetaan automaattisesti sijoitukset taustalla, jos niitä ei ole tallennettu
     ampujat.forEach(a => {
-        if (!rankingCache[a.id]) {
-            haeParasSijoitus(a.id);
+        if (!a.sijoitus || a.sijoitus === "-") {
+            haeAutomaattinenSijoitus(a.id);
         }
     });
 }
 
-async function haeParasSijoitus(sporttiId) {
+async function haeAutomaattinenSijoitus(sporttiId) {
     try {
-        const response = await fetch(`/api/resultlist/?fields!=partial&sport=1&category=2&level=8,10,11&type=1&limit=25&page=1&nocache=${Date.now()}`);
-        if (!response.ok) return;
-        const data = await response.json();
-        const results = Array.isArray(data) ? data : (data.content || data.results || data.data || []);
-        
-        // Etsitään kaikki rivit joissa esiintyy kyseinen sportti-id ja joissa on sijoitus
-        let parhaatSijoitukset = [];
-        results.forEach(r => {
-            const rId = String(r.sportti_id || r.shooter_id || r.competitor_id || (r.shooter && r.shooter.id) || "");
-            if (rId === String(sporttiId)) {
-                let sijoitus = parseInt(r.place || r.rank || r.position || 0, 10);
-                if (sijoitus > 0) parhaatSijoitukset.push(sijoitus);
-            }
-        });
+        // Käydään läpi vaikkapa 3 ensimmäistä sivua tilastoista
+        for (let page = 1; page <= 3; page++) {
+            const url = `/api/resultlist/?category=2&fields!=partial&level=8,10,11&limit=25&page=${page}&sport=1&type=1&nocache=${Date.now()}`;
+            const response = await fetch(url);
+            if (!response.ok) break;
+            const data = await response.json();
+            const rows = Array.isArray(data) ? data : (data.content || data.results || data.data || []);
+            
+            if (rows.length === 0) break;
 
-        if (parhaatSijoitukset.length > 0) {
-            rankingCache[sporttiId] = Math.min(...parhaatSijoitukset);
-        } else {
-            rankingCache[sporttiId] = "-";
+            for (let r of rows) {
+                const idKentta = String(r.sportti_id || r.shooter_id || r.competitor_id || (r.shooter && r.shooter.id) || (r.competitor && r.competitor.id) || "");
+                if (idKentta === String(sporttiId)) {
+                    let sijoitus = r.place || r.rank || r.position;
+                    if (sijoitus) {
+                        const ampujaObj = ampujat.find(a => String(a.id) === String(sporttiId));
+                        if (ampujaObj) {
+                            ampujaObj.sijoitus = String(sijoitus);
+                            localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
+                            paivitaNakyma();
+                            paivitaAmpujatLista();
+                        }
+                        return;
+                    }
+                }
+            }
         }
-        localStorage.setItem("kiti_ranking", JSON.stringify(rankingCache));
-        paivitaNakyma();
     } catch (e) {
         // Hiljainen virheenkäsittely taustahaulle
     }
@@ -422,10 +429,11 @@ async function lisaaJaHaeAmpuja() {
 
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
+    const manuaaliSijoitus = document.getElementById("uusiSijoitus").value.trim();
     if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
 
     const statusEl = document.getElementById("statusText");
-    statusEl.innerText = `Haetaan...`;
+    statusEl.innerText = `Haetaan tuloksia...`;
 
     try {
         const response = await fetch(`/api/kiti?id=${id}&nocache=${Date.now()}`);
@@ -458,24 +466,33 @@ async function lisaaJaHaeAmpuja() {
         }).filter(r => r.tulos > 0);
 
         if (uudet.length > 0) {
-            if (!ampujat.some(a => a.id === id)) {
-                ampujat.push({ nimi, id, aktiivinen: true });
-                localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
+            let olemassa = ampujat.find(a => a.id === id);
+            let lopullinenSijoitus = manuaaliSijoitus || (olemassa ? olemassa.sijoitus : "-");
+
+            if (!olemassa) {
+                ampujat.push({ nimi, id, sijoitus: lopullinenSijoitus, aktiivinen: true });
+            } else {
+                olemassa.nimi = nimi;
+                if (manuaaliSijoitus) olemassa.sijoitus = manuaaliSijoitus;
             }
+            localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
 
             tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
-            // Haetaan sijoitus tilastosta taustalla
-            haeParasSijoitus(id);
-
-            statusEl.innerText = `Löytyi ${uudet.length} tulosta.`;
+            statusEl.innerText = `Löytyi ${uudet.length} tulosta!`;
             
             document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
+            document.getElementById("uusiSijoitus").value = "";
             paivitaAmpujatLista();
             paivitaValikot(true);
             paivitaNakyma();
+
+            // Jos sijoitusta ei annettu käsin, yritetään hakea se automaattisesti tilasto-rajapinnasta
+            if (!lopullinenSijoitus || lopullinenSijoitus === "-") {
+                haeAutomaattinenSijoitus(id);
+            }
         } else {
             statusEl.innerText = "Ei kelvollisia tuloksia.";
         }
@@ -519,7 +536,7 @@ function paivitaAmpujatLista() {
         <div class="ampuja-item">
             <div class="ampuja-checkbox-wrap">
                 <input type="checkbox" id="amp_chk_${i}" ${a.aktiivinen !== false ? 'checked' : ''} onchange="vaihdaAmpujanTila(${i}, this.checked)">
-                <label for="amp_chk_${i}" style="margin:0; cursor:pointer; font-weight:600; color:var(--text-main); font-size:0.85rem; text-transform:none;">${a.nimi}</label>
+                <label for="amp_chk_${i}" style="margin:0; cursor:pointer; font-weight:600; color:var(--text-main); font-size:0.85rem; text-transform:none;">${a.nimi} ${a.sijoitus && a.sijoitus !== '-' ? '('+a.sijoitus+'. sij.)' : ''}</label>
             </div>
             <button class="btn-danger" onclick="poistaAmpuja(${i})">Poista</button>
         </div>
@@ -638,7 +655,7 @@ function paivitaNakyma() {
             const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
             const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
-            const sijoitus = rankingCache[ampObj.id] !== undefined ? rankingCache[ampObj.id] : "-";
+            const sijoitus = ampObj.sijoitus || "-";
 
             const lbl1 = maaraValinta === "kaikki" ? "Valitut (Kaikki)" : `Valitut (${aRivitRajattu.length} kpl)`;
             const lbl2 = "Viimeiset 3";
@@ -662,7 +679,7 @@ function paivitaNakyma() {
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat" title="Paras sijoitus Kitin virallisessa tilastolistauksessa"><span class="val" style="color:var(--success);">${sijoitus}</span><span class="lbl">Sijoitus</span></div>
+                        <div class="sub-stat" title="Paras sijoitus tilastossa"><span class="val" style="color:var(--success);">${sijoitus}</span><span class="lbl">Sijoitus</span></div>
                         <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
                         <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
