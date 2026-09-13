@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v76.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v77.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v76.0_PURE_API_DISciplines";
+const KITI_VERSIO = "v77.0_ACCURATE_DISciplines";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -428,20 +428,51 @@ function etsiKilpailunNimi(row) {
     return "Kilpailu";
 }
 
-function haeLajiDatasta(row) {
-    // Luetaan suoraan API:n tarjoamat kentät ilman omia arvauksia
-    if (row.event_name) return String(row.event_name);
-    if (row.eventName) return String(row.eventName);
-    if (row.sport_name) return String(row.sport_name);
-    if (row.sportName) return String(row.sportName);
-    if (row.sport) return String(row.sport);
-    if (row.discipline) return String(row.discipline);
-    if (row.discipline_name) return String(row.discipline_name);
-    if (row.disciplineName) return String(row.disciplineName);
+function tunnistaLajiTarkasti(row) {
+    const txt = JSON.stringify(row).toLowerCase();
+    const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
+    const tVal = parseFloat(String(row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0))).replace(",", "."));
 
-    if (row.event && typeof row.event === 'object') {
-        if (row.event.name) return String(row.event.name);
-        if (row.event.event_name) return String(row.event.event_name);
+    // 1. Haulikkolajit
+    if (txt.includes("skeet") || kisaNimi.includes("skeet")) return "Skeet";
+    if (txt.includes("trap") || kisaNimi.includes("trap")) return "Trap";
+    if (txt.includes("compak") || kisaNimi.includes("compak sporting") || kisaNimi.includes("sporting")) return "Compak Sporting";
+    if (txt.includes("haulikko") || kisaNimi.includes("haulikko")) return "Haulikko";
+
+    // 2. Ilmakivääri vs Kivääri
+    if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle") || (txt.includes("ilma") && txt.includes("kivääri"))) {
+        return "Ilmakivääri";
+    }
+
+    // 3. Pienoiskivääri / Kivääri (asento / makuu)
+    if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
+        const onAsento = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
+        return onAsento ? "Pienoiskivääri Asento (3x20/3x40)" : "Pienoiskivääri Makuu";
+    }
+
+    if (txt.includes("vapaakivääri")) return "Vapaakivääri";
+    if (txt.includes("kivääri")) {
+        if (tVal <= 650 && !txt.includes("300m") && !txt.includes("50m")) return "Ilmakivääri";
+        return (tVal > 800) ? "Kivääri Asento" : "Kivääri Makuu";
+    }
+
+    // 4. Pistoolilajit
+    if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
+    if (txt.includes("vapaapistooli") || txt.includes("vapaa-pistooli")) return "Vapaapistooli";
+    if (txt.includes("pienoispistooli") || txt.includes("pienois-pistooli")) return "Pienoispistooli";
+    if (txt.includes("isopistooli") || txt.includes("iso-pistooli")) return "Isopistooli";
+    if (txt.includes("olympiapistooli")) return "Olympiapistooli";
+    if (txt.includes("pika")) return "Pikapistooli";
+    if (txt.includes("vakiopistooli")) return "Vakiopistooli";
+    if (txt.includes("pistooli")) return "Pistooli (Muu)";
+
+    // 5. Muut lajit (hirvi, metsästys jne.)
+    if (txt.includes("hirvi") || txt.includes("luodikko") || txt.includes("metsästys")) return "Metsästysammunta";
+
+    // Palautetaan API:n tarjoama virallinen nimi jos saatavilla, muuten "Muu laji"
+    const apiNimi = row.event_name || row.eventName || row.sport_name || row.sportName || row.sport;
+    if (apiNimi && typeof apiNimi === 'string' && apiNimi.length > 1) {
+        return apiNimi;
     }
 
     return "Muu laji";
@@ -520,7 +551,7 @@ async function lisaaJaHaeAmpuja() {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
-                laji: haeLajiDatasta(row),
+                laji: tunnistaLajiTarkasti(row),
                 sarja: tunnistaSarja(row),
                 tulos: tulos,
                 sija: !isNaN(sija) ? sija : null
