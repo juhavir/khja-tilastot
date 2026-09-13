@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v63.0</title>
+    <title>KITI Tulosvertailu v65.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -21,19 +21,39 @@
             --silver: #cbd5e1;
             --bronze: #d97706;
             --input-bg: #070b16;
+            --table-hover: rgba(56, 189, 248, 0.03);
+            --target-color: rgba(56, 189, 248, 0.07);
+        }
+
+        [data-theme="light"] {
+            --bg: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(14, 165, 233, 0.2);
+            --card-border-glow: rgba(14, 165, 233, 0.5);
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --danger: #e11d48;
+            --success: #059669;
+            --gold: #d97706;
+            --silver: #475569;
+            --bronze: #b45309;
+            --input-bg: #f8fafc;
+            --table-hover: rgba(2, 132, 199, 0.04);
+            --target-color: rgba(2, 132, 199, 0.08);
         }
 
         * { box-sizing: border-box; }
 
         body { 
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            /* Luodaan taustalle tyylikäs ja himmeä ISSF 10m ilmakivääritaulu SVG-kuviona */
             background-color: var(--bg);
-            background-image: 
-                radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.88) 0%, rgba(4, 7, 16, 0.95) 100%),
-                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600' width='600' height='600'%3E%3Cg fill='none' stroke='%2338bdf8' stroke-opacity='0.04' stroke-width='2'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175'/%3E%3Ccircle cx='300' cy='300' r='140'/%3E%3Ccircle cx='300' cy='300' r='105'/%3E%3Ccircle cx='300' cy='300' r='70'/%3E%3Ccircle cx='300' cy='300' r='35'/%3E%3Ccircle cx='300' cy='300' r='12' fill='%2338bdf8' fill-opacity='0.02'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='1' stroke-opacity='0.03'/%3E%3C/g%3E%3C/svg%3E");
+            /* Piirretään tarkka ISSF-ilmataulu taustalle suoralla SVG-datakuviolla */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175'/%3E%3Ccircle cx='300' cy='300' r='140'/%3E%3Ccircle cx='300' cy='300' r='105'/%3E%3Ccircle cx='300' cy='300' r='70'/%3E%3Ccircle cx='300' cy='300' r='35'/%3E%3Ccircle cx='300' cy='300' r='12' fill='%2338bdf8'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: center 80px;
+            background-position: center 100px;
+            background-size: 500px 500px;
             background-attachment: fixed;
             color: var(--text-main); 
             margin: 0; 
@@ -41,9 +61,15 @@
             font-size: 0.88rem;
             line-height: 1.4;
             min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
         }
 
-        .container { max-width: 1320px; margin: 0 auto; }
+        /* Vaaleassa teemassa taulun väri mukautuu automaattisesti */
+        [data-theme="light"] body {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%230284c7' stroke-width='2'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175'/%3E%3Ccircle cx='300' cy='300' r='140'/%3E%3Ccircle cx='300' cy='300' r='105'/%3E%3Ccircle cx='300' cy='300' r='70'/%3E%3Ccircle cx='300' cy='300' r='35'/%3E%3Ccircle cx='300' cy='300' r='12' fill='%230284c7'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .container { max-width: 1320px; margin: 0 auto; position: relative; z-index: 2; }
 
         header { 
             background: var(--card-bg);
@@ -52,14 +78,30 @@
             padding: 12px 16px; 
             margin-bottom: 12px; 
             border-radius: 10px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        header h1 { margin: 0; font-size: 1.2rem; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 20px rgba(56,189,248,0.3); }
+        header h1 { margin: 0; font-size: 1.2rem; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; }
         header p { margin: 0; color: var(--text-muted); font-size: 0.75rem; }
+
+        .theme-btn {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            width: auto;
+            margin: 0;
+            box-shadow: none;
+            text-transform: none;
+        }
+        .theme-btn:hover { border-color: var(--primary); filter: none; }
 
         .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media (min-width: 1024px) { .grid { grid-template-columns: 280px 1fr; } }
@@ -71,10 +113,8 @@
             margin-bottom: 12px; 
             border: 1px solid var(--card-border); 
             border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            transition: border-color 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
-        .card:hover { border-color: var(--card-border-glow); }
 
         h2 { 
             font-size: 0.82rem; 
@@ -111,7 +151,7 @@
         button { 
             width: 100%; 
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-            color: #030712; 
+            color: #ffffff; 
             font-weight: 800; 
             border: none; 
             padding: 9px 12px; 
@@ -121,13 +161,13 @@
             margin-top: 12px; 
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            box-shadow: 0 4px 15px rgba(56,189,248,0.25);
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.2);
             transition: transform 0.1s, filter 0.2s;
         }
 
-        button:hover { filter: brightness(1.15); }
+        button:hover { filter: brightness(1.1); }
         button:active { transform: scale(0.97); }
-        button:disabled { background: #1e293b; color: var(--text-muted); box-shadow: none; cursor: not-allowed; }
+        button:disabled { background: var(--text-muted); color: var(--bg); box-shadow: none; cursor: not-allowed; }
 
         .btn-danger { 
             background: rgba(244, 63, 94, 0.12); 
@@ -155,12 +195,14 @@
 
         .stat-header { font-size: 0.8rem; font-weight: 800; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 6px; }
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; background: rgba(0,0,0,0.06); padding: 4px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 6px; }
+        [data-theme="dark"] .sub-stats-grid { background: rgba(0,0,0,0.3); }
+
         .sub-stat { display: flex; flex-direction: column; cursor: help; }
         .sub-stat .val { font-weight: 800; font-size: 0.78rem; color: var(--text-main); }
         .sub-stat .lbl { font-size: 0.42rem; color: var(--text-muted); margin-top: 1px; font-weight: 700; text-transform: uppercase; }
 
-        .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; text-align: center; font-size: 0.65rem; color: var(--text-muted); background: rgba(255,255,255,0.015); padding: 5px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; text-align: center; font-size: 0.65rem; color: var(--text-muted); background: rgba(0,0,0,0.02); padding: 5px; border-radius: 6px; border: 1px solid var(--card-border); }
         .extra-stats > div { cursor: help; }
         .extra-stats b { color: var(--text-main); display: block; font-size: 0.75rem; font-weight: 700; }
 
@@ -172,7 +214,7 @@
         th, td { padding: 7px 10px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
         th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 800; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.5px; }
         tr:last-child td { border-bottom: none; }
-        tr:hover td { background-color: rgba(56, 189, 248, 0.03); }
+        tr:hover td { background-color: var(--table-hover); }
 
         .ampuja-item { 
             display: flex; 
@@ -201,13 +243,13 @@
         }
 
         #statusText { font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; word-break: break-word; font-weight: 700; }
-        .tag { background: #1e293b; color: var(--text-main); padding: 2px 6px; font-size: 0.7rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
-        .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.25); }
+        .tag { background: var(--input-bg); color: var(--text-main); padding: 2px 6px; font-size: 0.7rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
+        .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid var(--card-border); }
 
         .info-box { 
-            background: rgba(251, 191, 36, 0.08); 
-            border: 1px solid rgba(251, 191, 36, 0.25); 
-            color: #fcd34d; 
+            background: rgba(251, 191, 36, 0.1); 
+            border: 1px solid rgba(251, 191, 36, 0.3); 
+            color: var(--gold); 
             padding: 8px 12px; 
             font-size: 0.78rem; 
             margin-bottom: 10px;
@@ -216,12 +258,15 @@
         }
     </style>
 </head>
-<body>
+<body data-theme="dark">
 
 <div class="container">
     <header>
-        <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Ampumaurheilun seuranta</p>
+        <div>
+            <h1>🎯 KITI Tulosvertailu</h1>
+            <p>Ampumaurheilun seuranta</p>
+        </div>
+        <button class="theme-btn" onclick="vaihdaTeema()" id="themeToggleBtn">☀️ Vaalea</button>
     </header>
 
     <div class="grid">
@@ -304,7 +349,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v63.0_TARGET_BG";
+const KITI_VERSIO = "v65.0_FIXED_BG";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -314,13 +359,34 @@ let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
-const variPaletti = ['#38bdf8', '#f43f5e', '#34d399', '#fbbf24', '#c084fc'];
+const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
 
 function alusta() {
+    const tallennettuTeema = localStorage.getItem("kiti_teema") || "dark";
+    asetaTeema(tallennettuTeema);
+
     ampujat.forEach(a => { if (a.aktiivinen === undefined) a.aktiivinen = true; });
     paivitaAmpujatLista();
     paivitaValikot(true);
     paivitaNakyma();
+}
+
+function vaihdaTeema() {
+    const nykyinen = document.body.getAttribute("data-theme");
+    const uusi = nykyinen === "dark" ? "light" : "dark";
+    asetaTeema(uusi);
+    localStorage.setItem("kiti_teema", uusi);
+    paivitaNakyma();
+}
+
+function asetaTeema(teema) {
+    document.body.setAttribute("data-theme", teema);
+    const btn = document.getElementById("themeToggleBtn");
+    if (teema === "light") {
+        btn.innerHTML = "🌙 Tumma";
+    } else {
+        btn.innerHTML = "☀️ Vaalea";
+    }
 }
 
 function etsiKilpailunNimi(row) {
@@ -717,6 +783,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
     const labels = Array.from(labelSet);
 
     const naytetaankoSijoituksia = (valittuLaji === "Kaikki" || valittuSarja === "Kaikki");
+    const isDark = document.body.getAttribute("data-theme") === "dark";
 
     const datasets = aktiivisetAmpujatNimet.map((amp, idx) => {
         const ampujaRivit = data.filter(d => d.ampuja === amp);
@@ -759,7 +826,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                 legend: { 
                     display: true, 
                     position: 'top',
-                    labels: { color: '#f8fafc', boxWidth: 10, font: { size: 10, weight: '700' } }
+                    labels: { color: isDark ? '#f8fafc' : '#0f172a', boxWidth: 10, font: { size: 10, weight: '700' } }
                 },
                 tooltip: {
                     callbacks: {
@@ -775,17 +842,17 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
             scales: { 
                 x: { 
                     ticks: {
-                        color: '#94a3b8',
+                        color: isDark ? '#94a3b8' : '#64748b',
                         maxRotation: 45,
                         minRotation: 45,
                         font: { size: 9 }
                     },
-                    grid: { color: 'rgba(255,255,255,0.03)' }
+                    grid: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)' }
                 },
                 y: {
                     reverse: naytetaankoSijoituksia,
                     ticks: { 
-                        color: '#94a3b8', 
+                        color: isDark ? '#94a3b8' : '#64748b', 
                         font: { size: 9 },
                         callback: function(value) {
                             if (naytetaankoSijoituksia) {
@@ -794,7 +861,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                             return value;
                         }
                     },
-                    grid: { color: 'rgba(255,255,255,0.03)' }
+                    grid: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)' }
                 }
             }
         }
