@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v81.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v82.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v81.0_DIRECT_TYPE_FIELD";
+const KITI_VERSIO = "v82.0_EXACT_TYPE_PROPERTY";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -429,23 +429,22 @@ function etsiKilpailunNimi(row) {
 }
 
 function lueLaji(row) {
-    // Luetaan suoraan KITI:n tarjoama tyyppi- tai lajikenttä (esim. "Tyyppi"-sarake)
-    const lajiArvo = row.type || row.eventType || row.event_name || row.eventName || row.sport_name || row.sportName || row.discipline || row.discipline_name;
-    if (lajiArvo && typeof lajiArvo === 'string' && lajiArvo.trim().length > 0) {
-        return lajiArvo.trim();
-    }
+    // Haetaan suoraan KITI:n tyyppi-kentästä ilman arvailuja
+    if (row.type !== undefined && row.type !== null) return String(row.type).trim();
+    if (row.event_name !== undefined) return String(row.event_name).trim();
+    if (row.eventName !== undefined) return String(row.eventName).trim();
     return "Muu laji";
 }
 
 function lueSarja(row) {
-    // Luetaan suoraan KITI:n tarjoama sarjakenttä (esim. "Sarja"-sarake)
-    const sarjaArvo = row.category || row.series || row.class_name || row.className || row.category_code;
-    if (sarjaArvo) {
-        if (typeof sarjaArvo === 'object') {
-            return sarjaArvo.name || sarjaArvo.code || "Muu";
+    // Haetaan suoraan KITI:n sarja-kentästä ilman arvailuja
+    if (row.category !== undefined && row.category !== null) {
+        if (typeof row.category === 'object') {
+            return String(row.category.name || row.category.code || "Muu").trim();
         }
-        return String(sarjaArvo).trim();
+        return String(row.category).trim();
     }
+    if (row.series !== undefined) return String(row.series).trim();
     return "Muu";
 }
 
