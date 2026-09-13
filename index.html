@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v27.0</title>
+    <title>KITI Tulosvertailu v28.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -139,10 +139,10 @@
 
         .stat-header { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; text-align: center; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; text-align: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
         .sub-stat { display: flex; flex-direction: column; cursor: help; }
-        .sub-stat .val { font-weight: 800; font-size: 0.9rem; color: var(--text-main); }
-        .sub-stat .lbl { font-size: 0.5rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
+        .sub-stat .val { font-weight: 800; font-size: 0.85rem; color: var(--text-main); }
+        .sub-stat .lbl { font-size: 0.48rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
 
         .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
         .extra-stats > div { cursor: help; }
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v27.0_CURRENT_FORM";
+const KITI_VERSIO = "v28.0_RANKING";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -296,6 +296,7 @@ if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
 
 let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
+let rankingCache = JSON.parse(localStorage.getItem("kiti_ranking")) || {}; // Tallennetaan haetut sijoitukset
 let myChart = null;
 
 const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
@@ -305,6 +306,42 @@ function alusta() {
     paivitaAmpujatLista();
     paivitaValikot(true);
     paivitaNakyma();
+    
+    // Haetaan taustalla sijoitukset niille ampujille, joilta se puuttuu
+    ampujat.forEach(a => {
+        if (!rankingCache[a.id]) {
+            haeParasSijoitus(a.id);
+        }
+    });
+}
+
+async function haeParasSijoitus(sporttiId) {
+    try {
+        const response = await fetch(`/api/resultlist/?fields!=partial&sport=1&category=2&level=8,10,11&type=1&limit=25&page=1&nocache=${Date.now()}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const results = Array.isArray(data) ? data : (data.content || data.results || data.data || []);
+        
+        // Etsitään kaikki rivit joissa esiintyy kyseinen sportti-id ja joissa on sijoitus
+        let parhaatSijoitukset = [];
+        results.forEach(r => {
+            const rId = String(r.sportti_id || r.shooter_id || r.competitor_id || (r.shooter && r.shooter.id) || "");
+            if (rId === String(sporttiId)) {
+                let sijoitus = parseInt(r.place || r.rank || r.position || 0, 10);
+                if (sijoitus > 0) parhaatSijoitukset.push(sijoitus);
+            }
+        });
+
+        if (parhaatSijoitukset.length > 0) {
+            rankingCache[sporttiId] = Math.min(...parhaatSijoitukset);
+        } else {
+            rankingCache[sporttiId] = "-";
+        }
+        localStorage.setItem("kiti_ranking", JSON.stringify(rankingCache));
+        paivitaNakyma();
+    } catch (e) {
+        // Hiljainen virheenkäsittely taustahaulle
+    }
 }
 
 function etsiKilpailunNimi(row) {
@@ -429,6 +466,9 @@ async function lisaaJaHaeAmpuja() {
             tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
+            // Haetaan sijoitus tilastosta taustalla
+            haeParasSijoitus(id);
+
             statusEl.innerText = `Löytyi ${uudet.length} tulosta.`;
             
             document.getElementById("uusiNimi").value = "";
@@ -526,7 +566,7 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     } else if (asetaUusinOletukseksi && suodatettuData.length > 0) {
         const uusinRivi = jarjestaPvmMukaan(suodatettuData, true)[0];
         if (uusinRivi && sarjat.includes(uusinRivi.sarja)) {
-            sarjaSelect.value = uusinvRivi.sarja;
+            sarjaSelect.value = uusinRivi.sarja;
         }
     }
 }
@@ -536,16 +576,15 @@ function laskeKA(arr) {
     return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
 }
 
-// Laskee viimeisen 5 kisan keskiarvon josta on poistettu paras ja heikoin tulos
 function laskeKisakunto(arr) {
     if (!arr || arr.length === 0) return "-";
     const viisi = arr.slice(0, 5);
     if (viisi.length <= 2) {
-        return laskeKA(viisi); // Jos kisoja on liian vähän ääripäiden pudottamiseen, näytetään normaali ka
+        return laskeKA(viisi);
     }
     const kopio = [...viisi].sort((a, b) => a - b);
-    kopio.shift(); // poistetaan matalin
-    kopio.pop();   // poistetaan korkein
+    kopio.shift();
+    kopio.pop();
     if (kopio.length === 0) return laskeKA(viisi);
     return (kopio.reduce((a, b) => a + b, 0) / kopio.length).toFixed(1);
 }
@@ -563,7 +602,8 @@ function paivitaNakyma() {
     const maaraValinta = document.getElementById("maaraSelect").value;
     const infoEl = document.getElementById("vertailuIlmoitus");
 
-    const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
+    const aktiivisetAmpujat = ampujat.filter(a => a.aktiivinen !== false);
+    const aktiivisetAmpujatNimet = aktiivisetAmpujat.map(a => a.nimi);
 
     const onEiValittu = (valittuLaji === "Kaikki" || valittuSarja === "Kaikki");
     if (aktiivisetAmpujatNimet.length > 1 && onEiValittu) {
@@ -580,8 +620,9 @@ function paivitaNakyma() {
 
     const statsContainer = document.getElementById("ampujatStats");
 
-    if (aktiivisetAmpujatNimet.length > 0) {
-        statsContainer.innerHTML = aktiivisetAmpujatNimet.map((amp, idx) => {
+    if (aktiivisetAmpujat.length > 0) {
+        statsContainer.innerHTML = aktiivisetAmpujat.map((ampObj, idx) => {
+            const amp = ampObj.nimi;
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
             
             let aRivitRajattu = aRivitKaikki;
@@ -597,9 +638,9 @@ function paivitaNakyma() {
             const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
             const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
+            const sijoitus = rankingCache[ampObj.id] !== undefined ? rankingCache[ampObj.id] : "-";
 
             const lbl1 = maaraValinta === "kaikki" ? "Valitut (Kaikki)" : `Valitut (${aRivitRajattu.length} kpl)`;
-            const lblKisakunto = "Tämänhetkinen kisakunto";
             const lbl2 = "Viimeiset 3";
             const lbl3 = "Viimeiset 5";
             const lbl4 = "Viimeiset 10";
@@ -621,6 +662,7 @@ function paivitaNakyma() {
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
+                        <div class="sub-stat" title="Paras sijoitus Kitin virallisessa tilastolistauksessa"><span class="val" style="color:var(--success);">${sijoitus}</span><span class="lbl">Sijoitus</span></div>
                         <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
                         <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
