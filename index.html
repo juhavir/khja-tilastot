@@ -7,40 +7,135 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
-            --primary: #0f172a; 
-            --primary-light: #3b82f6; 
-            --success: #10b981;
-            --danger: #ef4444;
-            --bg: #f8fafc; 
-            --card-bg: #ffffff; 
-            --text: #1e293b; 
-            --border: #e2e8f0;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #34d399;
+            --danger: #f87171;
+            --input-bg: #0f172a;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 16px; 
+        }
+
         .container { max-width: 1200px; margin: 0 auto; }
-        header { background: linear-gradient(135deg, var(--primary), #1e293b); color: white; padding: 28px 32px; border-radius: 16px; margin-bottom: 24px; }
-        header h1 { margin: 0; font-size: 1.8rem; }
-        header p { margin: 8px 0 0 0; opacity: 0.8; font-size: 0.95rem; }
-        .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
-        @media (min-width: 768px) { .grid { grid-template-columns: 360px 1fr; } }
-        .card { background: var(--card-bg); padding: 20px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
-        h2 { font-size: 1.1rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid var(--bg); padding-bottom: 8px; }
-        label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.85rem; color: #475569; }
-        select, input { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
-        button { width: 100%; background-color: var(--primary-light); color: white; font-weight: 600; border: none; padding: 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
-        .btn-danger { background-color: var(--danger); margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
+
+        header { 
+            background: linear-gradient(135deg, #1e293b, #0f172a); 
+            border: 1px solid var(--card-border);
+            color: var(--text-main); 
+            padding: 24px; 
+            border-radius: 16px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        header h1 { margin: 0; font-size: 1.6rem; color: var(--primary); }
+        header p { margin: 6px 0 0 0; color: var(--text-muted); font-size: 0.9rem; }
+
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 900px) { .grid { grid-template-columns: 340px 1fr; } }
+
+        .card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+            margin-bottom: 20px; 
+            border: 1px solid var(--card-border); 
+        }
+
+        h2 { 
+            font-size: 1.05rem; 
+            margin-top: 0; 
+            color: var(--primary); 
+            border-bottom: 1px solid var(--card-border); 
+            padding-bottom: 10px; 
+        }
+
+        label { display: block; margin-top: 14px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+
+        select, input { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 6px; 
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border); 
+            color: var(--text-main);
+            border-radius: 8px; 
+            font-size: 0.95rem; 
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input:focus { border-color: var(--primary); }
+
+        button { 
+            width: 100%; 
+            background-color: var(--primary); 
+            color: #0f172a; 
+            font-weight: 700; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin-top: 16px; 
+            transition: background 0.2s, transform 0.1s; 
+        }
+
+        button:hover { background-color: var(--primary-hover); color: white; }
+        button:active { transform: scale(0.98); }
+
+        .btn-danger { background-color: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid var(--danger); margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
+        .btn-danger:hover { background-color: var(--danger); color: white; }
+
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .stat-box { background: var(--bg); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
-        .stat-box .number { font-size: 1.4rem; font-weight: bold; color: var(--primary-light); }
-        .stat-box .label { font-size: 0.75rem; color: #64748b; margin-top: 4px; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-        .ampuja-item { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.9rem; }
-        #statusText { font-size: 0.85rem; color: var(--success); margin-top: 10px; font-weight: 600; text-align: center; word-break: break-word; }
-        .tag { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-        .ka-box { text-align: left; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+
+        .stat-box { 
+            background: var(--input-bg); 
+            padding: 16px; 
+            border-radius: 12px; 
+            text-align: center; 
+            border: 1px solid var(--card-border); 
+        }
+
+        .stat-box .number { font-size: 1.5rem; font-weight: bold; margin: 4px 0; }
+        .stat-box .label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .chart-container { position: relative; width: 100%; overflow-x: auto; }
+
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; text-align: left; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+        th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 600; }
+
+        .ampuja-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: var(--input-bg); 
+            padding: 10px 14px; 
+            border-radius: 8px; 
+            margin-top: 8px; 
+            border: 1px solid var(--card-border);
+            font-size: 0.9rem; 
+        }
+
+        #statusText { font-size: 0.85rem; color: var(--success); margin-top: 12px; font-weight: 600; text-align: center; word-break: break-word; }
+        .tag { background: #334155; color: var(--text-main); padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; }
+        .tag-laji { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
     </style>
 </head>
 <body>
@@ -48,7 +143,7 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Vertaile ampujien tuloskehitystä lajeittain ja sarjoittain</p>
+        <p>Seuraa ja vertaile ammunnan tuloskehitystä lajeittain ja sarjoittain</p>
     </header>
 
     <div class="grid">
@@ -65,7 +160,7 @@
                 <button onclick="lisaaJaHaeAmpuja()">+ Lisää ja Hae Tulokset</button>
                 <div id="statusText"></div>
 
-                <h3 style="font-size: 0.9rem; margin-top: 20px; color: #475569;">Lista:</h3>
+                <h3 style="font-size: 0.85rem; margin-top: 20px; color: var(--text-muted); text-transform: uppercase;">Tallennetut ampujat:</h3>
                 <div id="ampujatLista"></div>
             </div>
 
@@ -95,15 +190,28 @@
             <div class="card">
                 <h2>Ampujakohtaiset Keskiarvot</h2>
                 <div id="ampujatStats" class="stats-grid"></div>
-                <canvas id="tulosKaavio" height="130"></canvas>
+                <div class="chart-container">
+                    <canvas id="tulosKaavio" height="140"></canvas>
+                </div>
             </div>
 
             <div class="card">
                 <h2>Tuloshistoria</h2>
-                <table>
-                    <thead><tr><th>Pvm</th><th>Kilpailu</th><th>Ampuja</th><th>Laji</th><th>Sarja</th><th>Tulos</th></tr></thead>
-                    <tbody id="tulosTaulukko"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pvm</th>
+                                <th>Kilpailu</th>
+                                <th>Ampuja</th>
+                                <th>Laji</th>
+                                <th>Sarja</th>
+                                <th>Tulos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tulosTaulukko"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -114,7 +222,7 @@ let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
-const variPaletti = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc', '#f472b6', '#22d3ee'];
 
 function alusta() {
     paivitaAmpujatLista();
@@ -147,7 +255,7 @@ async function lisaaJaHaeAmpuja() {
     if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
 
     const statusEl = document.getElementById("statusText");
-    statusEl.style.color = "#3b82f6";
+    statusEl.style.color = "var(--primary)";
     statusEl.innerText = `Haetaan tuloksia henkilölle ${nimi}...`;
 
     try {
@@ -165,9 +273,13 @@ async function lisaaJaHaeAmpuja() {
 
         const uudet = rows.map(row => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
+            
+            const rawDate = row.competition_start_date || row.competitionStartDate || row.startDate || row.date || row.created_at || "";
+            const pvmPuhdas = rawDate ? String(rawDate).substring(0, 10) : "Tuntematon";
+
             return {
-                pvm: String(row.competitionStartDate || row.startDate || row.date || "2026-01-01").substring(0, 10),
-                kilpailu: String(row.competitionName || row.name || "Kilpailu"),
+                pvm: pvmPuhdas,
+                kilpailu: String(row.competition_name || row.competitionName || row.name || "Kilpailu"),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
@@ -193,7 +305,7 @@ async function lisaaJaHaeAmpuja() {
             paivitaValikot();
             paivitaNakyma();
         } else {
-            statusEl.style.color = "#f59e0b";
+            statusEl.style.color = "#fbbf24";
             statusEl.innerText = "Urheilija löytyi, mutta tulosrivejä ei ollut.";
         }
     } catch (e) {
@@ -218,12 +330,12 @@ function poistaAmpuja(index) {
 function paivitaAmpujatLista() {
     const lista = document.getElementById("ampujatLista");
     if (ampujat.length === 0) {
-        lista.innerHTML = '<p style="font-size:0.85rem; color:#94a3b8;">Ei tallennettuja ampujia.</p>';
+        lista.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">Ei tallennettuja ampujia.</p>';
         return;
     }
     lista.innerHTML = ampujat.map((a, i) => `
         <div class="ampuja-item">
-            <span><b>${a.nimi}</b> <span style="font-size:0.75rem; color:#64748b;">(ID: ${a.id})</span></span>
+            <span><b>${a.nimi}</b> <span style="font-size:0.75rem; color:var(--text-muted);">(ID: ${a.id})</span></span>
             <button class="btn-danger" onclick="poistaAmpuja(${i})">Poista</button>
         </div>
     `).join("");
@@ -253,7 +365,6 @@ function paivitaNakyma() {
         (valittuSarja === "Kaikki" || d.sarja === valittuSarja)
     );
 
-    // Suodatetaan aikaväli 3kk, 6kk, 12kk
     if (aikaRajoitus !== "all") {
         const kk = parseInt(aikaRajoitus);
         const rajaPvm = new Date();
@@ -261,7 +372,6 @@ function paivitaNakyma() {
         data = data.filter(d => new Date(d.pvm) >= rajaPvm);
     }
 
-    // Ampujakohtaiset keskiarvot ja parhaat tulokset
     const nimekkäätAmpujat = [...new Set(data.map(d => d.ampuja))];
     const statsContainer = document.getElementById("ampujatStats");
 
@@ -276,22 +386,21 @@ function paivitaNakyma() {
                     <div style="font-size:0.85rem; font-weight:bold; color:${vari};">${amp}</div>
                     <div class="number" style="color:${vari};">${ka}</div>
                     <div class="label">KA (${aTulokset.length} kisaa)</div>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">Paras: <b>${max}</b></div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Paras: <b>${max}</b></div>
                 </div>
             `;
         }).join("");
     } else {
-        statsContainer.innerHTML = '<div style="font-size:0.85rem; color:#94a3b8; padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
+        statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // Taulukko (uusin ensin)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = [...data].sort((a,b) => new Date(b.pvm) - new Date(a.pvm)).map(d => `
         <tr>
             <td>${d.pvm}</td>
-            <td style="color: #64748b;">${d.kilpailu}</td>
+            <td style="color: var(--text-muted);">${d.kilpailu}</td>
             <td><b>${d.ampuja}</b></td>
-            <td><span class="tag" style="background:#dbeafe; color:#1e40af;">${d.laji}</span></td>
+            <td><span class="tag tag-laji">${d.laji}</span></td>
             <td><span class="tag">${d.sarja}</span></td>
             <td><b>${d.tulos}</b></td>
         </tr>
@@ -303,7 +412,6 @@ function paivitaNakyma() {
 function piirraKaavio(data) {
     const ctx = document.getElementById('tulosKaavio').getContext('2d');
     
-    // JARJESTETAAN TULOKSET GRAAFIIN: Vanhin vasemmalla, uusin oikealla
     const sorted = [...data].sort((a, b) => new Date(a.pvm) - new Date(b.pvm));
 
     if (myChart) { myChart.destroy(); }
@@ -313,15 +421,19 @@ function piirraKaavio(data) {
     const datasets = ampujatLista.map((amp, idx) => {
         const ampujaData = sorted.filter(d => d.ampuja === amp);
         const vari = variPaletti[idx % variPaletti.length];
+        
         return {
             label: amp,
-            data: ampujaData.map(d => ({ x: d.pvm, y: d.tulos })),
+            data: ampujaData.map(d => ({ 
+                x: `${d.pvm} (${d.kilpailu})`, 
+                y: d.tulos 
+            })),
             borderColor: vari,
             backgroundColor: vari,
             borderWidth: 2,
-            tension: 0.15,
-            pointRadius: 5,
-            pointHoverRadius: 7
+            tension: 0.2,
+            pointRadius: 4,
+            pointHoverRadius: 6
         };
     });
 
@@ -330,12 +442,17 @@ function piirraKaavio(data) {
         data: { datasets: datasets },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: { 
-                legend: { display: true, position: 'top' },
+                legend: { 
+                    display: true, 
+                    position: 'top',
+                    labels: { color: '#f8fafc' }
+                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: ${context.raw.y} pistettä`;
+                            return `${context.dataset.label}: ${context.raw.y} pnt`;
                         }
                     }
                 }
@@ -343,10 +460,17 @@ function piirraKaavio(data) {
             scales: { 
                 x: { 
                     type: 'category',
-                    title: { display: true, text: 'Aika (Vanhin -> Uusin)' }
+                    ticks: {
+                        color: '#94a3b8',
+                        maxRotation: 45,
+                        minRotation: 45,
+                        font: { size: 10 }
+                    },
+                    grid: { color: '#334155' }
                 },
                 y: {
-                    title: { display: true, text: 'Tulos' }
+                    ticks: { color: '#94a3b8' },
+                    grid: { color: '#334155' }
                 }
             }
         }
