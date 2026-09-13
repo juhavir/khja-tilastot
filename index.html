@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v103.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v104.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -385,7 +385,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v103.0_LARGER_FONTS_CLUB_FIX";
+const KITI_VERSIO = "v104.0_NO_DATES_IN_CHART";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -898,9 +898,10 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
     const jarjestettyKokoData = jarjestaPvmMukaan(data, false);
     
+    // Korjattu: käytetään kaaviossa pelkkää kilpailun nimeä ilman päivämäärää
     const labelSet = new Set();
     jarjestettyKokoData.forEach(d => {
-        labelSet.add(`${d.pvm} (${d.kilpailu})`);
+        labelSet.add(d.kilpailu);
     });
     const labels = Array.from(labelSet);
 
@@ -912,7 +913,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
         const vari = variPaletti[idx % variPaletti.length];
         
         const pointData = labels.map(lbl => {
-            const hit = ampujaRivit.find(d => `${d.pvm} (${d.kilpailu})` === lbl);
+            const hit = ampujaRivit.find(d => d.kilpailu === lbl);
             if (!hit) return null;
 
             if (naytetaankoSijoituksia) {
@@ -953,9 +954,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            const fullLabel = context[0].label || "";
-                            const match = fullLabel.match(/\(([^)]+)\)$/);
-                            return match ? match[1] : fullLabel;
+                            return context[0].label || "";
                         },
                         label: function(context) {
                             if (naytetaankoSijoituksia) {
