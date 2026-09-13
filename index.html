@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v93.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v94.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -262,11 +262,12 @@
 
         .kiti-link {
             color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
+            text-decoration: underline;
+            font-weight: 700;
+            cursor: pointer;
         }
         .kiti-link:hover {
-            text-decoration: underline;
+            color: var(--primary-hover);
         }
 
         .info-box { 
@@ -384,7 +385,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v93.0_KITI_LINK_SUPPORT";
+const KITI_VERSIO = "v94.0_KITI_LINK_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -449,10 +450,10 @@ function etsiKilpailunNimi(row) {
 function etsiKilpailuId(row) {
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
-        if (c.id) return c.id;
+        if (c.id !== undefined && c.id !== null) return c.id;
     }
-    if (row.competition_id) return row.competition_id;
-    if (row.competitionId) return row.competitionId;
+    if (row.competition_id !== undefined && row.competition_id !== null) return row.competition_id;
+    if (row.competitionId !== undefined && row.competitionId !== null) return row.competitionId;
     return null;
 }
 
@@ -895,7 +896,7 @@ async function paivitaNakyma() {
     tbody.innerHTML = jarjestaPvmMukaan(taulukkoData, true).map((d) => {
         let kilpailuSolu = d.kilpailu;
         if (d.kisaId) {
-            kilpailuSolu = `<a href="https://kiti.ampumaurheiluliitto.fi/#/competition/${d.kisaId}" target="_blank" class="kiti-link" title="Avaa KITI-kilpailusivu">${d.kilpailu} ↗</a>`;
+            kilpailuSolu = `<a href="https://kiti.ampumaurheiluliitto.fi/#/competition/${d.kisaId}" target="_blank" class="kiti-link">${d.kilpailu} ↗</a>`;
         }
         return `
             <tr>
