@@ -13,18 +13,17 @@ export default async function handler(req, res) {
     };
 
     try {
-        // 1. Etsitään ampuja ja hänen sisäinen KITI-ID:nsä Sportti-ID:llä
+        // 1. Etsitään ampuja Sportti-ID:llä
         const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${sporttiId}`;
         const searchRes = await fetch(searchUrl, { headers });
         
         if (!searchRes.ok) {
-            return res.status(searchRes.status).json({ error: `KITI-haku epäonnistui (koodi ${searchRes.status})` });
+            return res.status(searchRes.status).json({ error: `KITI-haku epäonnistui (${searchRes.status})` });
         }
 
         const searchData = await searchRes.json();
         const athletes = Array.isArray(searchData) ? searchData : (searchData.results || searchData.content || searchData.data || []);
 
-        // Etsitään tasan se ampuja, jonka sportti_id tai muu id täsmää syötettyyn numeroon
         let internalId = null;
         for (let ath of athletes) {
             if (String(ath.sportti_id) === String(sporttiId) || String(ath.license_code) === String(sporttiId) || String(ath.id) === String(sporttiId)) {
@@ -33,21 +32,20 @@ export default async function handler(req, res) {
             }
         }
 
-        // Jos tarkkaa täsmäystä ei löytynyt vertailussa, otetaan ensimmäinen hakutulos jos sellainen tuli
         if (!internalId && athletes.length > 0) {
             internalId = athletes[0].id || athletes[0].person_id || athletes[0].personId;
         }
 
         if (!internalId) {
-            return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}. Tarkista numero.` });
+            return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}.` });
         }
 
-        // 2. Haetaan viralliset tulokset täsmällisellä sisäisellä ID:llä
+        // 2. Haetaan tulokset
         const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition_start_date`;
         const resultsRes = await fetch(resultsUrl, { headers });
 
         if (!resultsRes.ok) {
-            return res.status(resultsRes.status).json({ error: `Tulosten haku epäonnistui (koodi ${resultsRes.status})` });
+            return res.status(resultsRes.status).json({ error: `Tulosten haku epäonnistui (${resultsRes.status})` });
         }
 
         const resultsData = await resultsRes.json();
