@@ -233,18 +233,24 @@ function alusta() {
     paivitaNakyma();
 }
 
-function etsiPaivamaara(row) {
-    if (row.competition_start_date) return String(row.competition_start_date).substring(0, 10);
-    if (row.competitionStartDate) return String(row.competitionStartDate).substring(0, 10);
-    if (row.startDate) return String(row.startDate).substring(0, 10);
-    if (row.date) return String(row.date).substring(0, 10);
-    if (row.created_at) return String(row.created_at).substring(0, 10);
+// Rekursiivinen funktio, joka etsii paivamaaran mista tahansa KITI-JSONin aliobjektista
+function etsiPaivamaara(obj) {
+    if (!obj) return "";
     
-    if (row.competition && typeof row.competition === 'object') {
-        const c = row.competition;
-        if (c.start_date) return String(c.start_date).substring(0, 10);
-        if (c.startDate) return String(c.startDate).substring(0, 10);
-        if (c.date) return String(c.date).substring(0, 10);
+    // Suorat kentat
+    const directKeys = ['start_date', 'startDate', 'competition_start_date', 'competitionStartDate', 'date', 'created_at'];
+    for (let key of directKeys) {
+        if (obj[key] && typeof obj[key] === 'string' && obj[key].match(/^\d{4}-\d{2}-\d{2}/)) {
+            return obj[key].substring(0, 10);
+        }
+    }
+
+    // Aliobjektit (competition, match, event, jne.)
+    for (let key in obj) {
+        if (obj[key] && typeof obj[key] === 'object') {
+            const found = etsiPaivamaara(obj[key]);
+            if (found) return found;
+        }
     }
     return "";
 }
@@ -310,8 +316,8 @@ async function lisaaJaHaeAmpuja() {
             let kisaNimi = etsiKilpailunNimi(row);
 
             return {
-                origIndex: index, // KITI:ssä index 0 = uusin kisa, suurin index = vanhin kisa
-                pvm: pvmPuhdas,
+                origIndex: index,
+                pvm: pvmPuhdas || `Kisa #${rows.length - index}`,
                 kilpailu: kisaNimi,
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
@@ -403,6 +409,19 @@ function laskeKA(arr) {
     return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
 }
 
+function jarjestaAikajarjestykseen(dataArr, uusinEnsin = true) {
+    return [...dataArr].sort((a, b) => {
+        const pvmA = a.pvm.match(/^\d{4}-\d{2}-\d{2}/) ? new Date(a.pvm).getTime() : 0;
+        const pvmB = b.pvm.match(/^\d{4}-\d{2}-\d{2}/) ? new Date(b.pvm).getTime() : 0;
+
+        if (pvmA && pvmB && pvmA !== pvmB) {
+            return uusinEnsin ? pvmB - pvmA : pvmA - pvmB;
+        }
+        // Jos päivämääriä ei ole tai ne ovat samoja, käytetään KITI-indeksiä
+        return uusinEnsin ? a.origIndex - b.origIndex : b.origIndex - a.origIndex;
+    });
+}
+
 function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
@@ -418,9 +437,8 @@ function paivitaNakyma() {
         const rajaPvm = new Date();
         rajaPvm.setMonth(rajaPvm.getMonth() - kk);
         data = data.filter(d => {
-            if (!d.pvm) return true;
-            const dateObj = new Date(d.pvm);
-            return isNaN(dateObj.getTime()) || dateObj >= rajaPvm;
+            if (!d.pvm || !d.pvm.match(/^\d{4}-\d{2}-\d{2}/)) return true;
+            return new Date(d.pvm) >= rajaPvm;
         });
     }
 
@@ -429,8 +447,7 @@ function paivitaNakyma() {
 
     if (nimekkäätAmpujat.length > 0) {
         statsContainer.innerHTML = nimekkäätAmpujat.map((amp, idx) => {
-            // Uusin kisa on aina ensimmaisena (origIndex 0 -> N)
-            const aTuloksetRivit = data.filter(d => d.ampuja === amp).sort((a,b) => a.origIndex - b.origIndex);
+            const aTuloksetRivit = jarjestaAikajarjestykseen(data.filter(d => d.ampuja === amp), true);
             const aTulokset = aTuloksetRivit.map(d => d.tulos);
             
             const kaKaikki = laskeKA(aTulokset);
@@ -456,11 +473,11 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO (Uusin kisa ylimpana)
+    // TAULUKKO (Uusin kisa ylimpänä)
     const tbody = document.getElementById("tulosTaulukko");
-    tbody.innerHTML = [...data].sort((a,b) => a.origIndex - b.origIndex).map(d => `
+    tbody.innerHTML = jarjestaAikajarjestykseen(data, true).map(d => `
         <tr>
-            <td>${d.pvm || "Kisa"}</td>
+            <td><b>${d.pvm}</b></td>
             <td style="color: var(--text-muted);">${d.kilpailu}</td>
             <td><b>${d.ampuja}</b></td>
             <td><span class="tag tag-laji">${d.laji}</span></td>
@@ -480,24 +497,20 @@ function piirraKaavio(data) {
     const ampujatLista = [...new Set(data.map(d => d.ampuja))];
 
     const datasets = ampujatLista.map((amp, idx) => {
-        // GRAAFI (Vanhin kisa vasemmalle -> suurin origIndex ensin, uusin oikealle -> pienin origIndex)
-        const ampujaData = data.filter(d => d.ampuja === amp).sort((a, b) => b.origIndex - a.origIndex);
+        // GRAAFI (Vanhin kisa vasemmalla -> false)
+        const ampujaData = jarjestaAikajarjestykseen(data.filter(d => d.ampuja === amp), false);
         const vari = variPaletti[idx % variPaletti.length];
         
         return {
             label: amp,
-            data: ampujaData.map(d => {
-                const pvmTeksti = d.pvm ? `${d.pvm} ` : '';
-                const otsikko = `${pvmTeksti}(${d.kilpailu})`;
-                return {
-                    x: otsikko,
-                    y: d.tulos
-                };
-            }),
+            data: ampujaData.map(d => ({
+                x: `${d.pvm} (${d.kilpailu})`,
+                y: d.tulos
+            })),
             borderColor: vari,
             backgroundColor: vari,
             borderWidth: 2,
-            tension: 0.25,
+            tension: 0.2,
             pointRadius: 5,
             pointHoverRadius: 8
         };
