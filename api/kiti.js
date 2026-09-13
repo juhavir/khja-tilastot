@@ -39,8 +39,8 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}.` });
         }
 
-        // Haetaan tulokset pakottaen KITI-rajapinta järjestämään kisan alkamispäivämäärän mukaan
-        const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition__start_date`;
+        // Haetaan urheilijan tuloslista
+        const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}`;
         const resultsRes = await fetch(resultsUrl, { headers });
 
         if (!resultsRes.ok) {
@@ -50,15 +50,22 @@ export default async function handler(req, res) {
         const resultsData = await resultsRes.json();
         const rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
 
-        // Poimitaan kunkin kilpailun aito kisa-alkamispäivämäärä KITI-oliosta
+        // Poimitaan kisan alkamispäivämäärä KITI:n käyttämistä kentistä
         const formatoidutRows = rows.map(row => {
             let pvm = "";
-            
-            if (row.competition && typeof row.competition === 'object') {
-                pvm = row.competition.start_date || row.competition.startDate || row.competition.date || "";
-            }
-            if (!pvm) {
-                pvm = row.competition_start_date || row.competitionStartDate || row.start_date || row.startDate || row.date || "";
+
+            if (row.competition_start_date) {
+                pvm = row.competition_start_date;
+            } else if (row.start_date) {
+                pvm = row.start_date;
+            } else if (row.competition && typeof row.competition === 'object') {
+                pvm = row.competition.competition_start_date || row.competition.start_date || row.competition.startDate || row.competition.date || "";
+            } else if (row.competition_info && typeof row.competition_info === 'object') {
+                pvm = row.competition_info.start_date || row.competition_info.competition_start_date || "";
+            } else if (row.startDate) {
+                pvm = row.startDate;
+            } else if (row.date) {
+                pvm = row.date;
             }
 
             return {
