@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     };
 
     try {
-        // 1. Hae urheilija
+        // 1. Hae urheilija Sportti-ID:llä
         const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${sporttiId}`;
         const searchRes = await fetch(searchUrl, { headers });
         if (!searchRes.ok) throw new Error(`KITI-haku epäonnistui (${searchRes.status})`);
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         if (!internalId && athletes.length > 0) internalId = athletes[0].id || athletes[0].person_id || athletes[0].personId;
         if (!internalId) return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}.` });
 
-        // 2. Hae tuloslista
+        // 2. Hae urheilijan tulokset
         const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}`;
         const resultsRes = await fetch(resultsUrl, { headers });
         if (!resultsRes.ok) throw new Error(`Tulosten haku epäonnistui (${resultsRes.status})`);
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
         const compIds = [...new Set(rows.map(getCompId).filter(Boolean))];
 
-        // 4. Haetaan jokaiselle kilpailulle sen virallinen alkamispäivä KITI:n competition API:sta
+        // 4. Haetaan palvelinpäässä jokaiselle kilpailulle sen virallinen alkamispäivä KITI:stä (ohittaa CORS-ongelman)
         const compDateMap = {};
         await Promise.all(compIds.map(async (cId) => {
             try {
@@ -64,16 +64,15 @@ export default async function handler(req, res) {
                     if (pvm) compDateMap[cId] = String(pvm).substring(0, 10);
                 }
             } catch (e) {
-                // Sivuutetaan yksittäisen kisan hakuvirhe
+                // Yksittäisen haun epäonnistuminen sivuutetaan
             }
         }));
 
-        // 5. Muodostetaan lopullinen data
+        // 5. Liitetään aito päivämäärä riville
         const formatoidutRows = rows.map(row => {
             const cId = getCompId(row);
             let pvm = compDateMap[cId] || "";
 
-            // Varalla rekursiivinen haku jos competition API ei palauttanut pvm:ää
             if (!pvm) {
                 if (row.competition_start_date) pvm = row.competition_start_date;
                 else if (row.start_date) pvm = row.start_date;
