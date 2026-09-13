@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v3.0</title>
+    <title>KITI Tulosvertailu v4.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -213,8 +213,8 @@
 </div>
 
 <script>
-// Tyhjennetään selaimen vanha muisti v3.0 johdosta
-const KITI_VERSIO = "v3.0_RELEASE";
+// Tyhjennetään selaimen vanha muisti v4.0 johdosta
+const KITI_VERSIO = "v4.0_DIRECT_FETCH";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -264,6 +264,43 @@ function tunnistaSarja(row) {
     return "Muu";
 }
 
+// Rekursiivinen etsintä kisan alkamispäivämäärälle
+function kaivaPaivamaara(obj) {
+    if (!obj) return "";
+    
+    if (typeof obj === 'object') {
+        if (obj.competition_start_date) return String(obj.competition_start_date).substring(0, 10);
+        if (obj.start_date) return String(obj.start_date).substring(0, 10);
+        if (obj.startDate) return String(obj.startDate).substring(0, 10);
+        if (obj.competitionStartDate) return String(obj.competitionStartDate).substring(0, 10);
+        
+        if (obj.competition && typeof obj.competition === 'object') {
+            const res = kaivaPaivamaara(obj.competition);
+            if (res) return res;
+        }
+        if (obj.event && typeof obj.event === 'object') {
+            const res = kaivaPaivamaara(obj.event);
+            if (res) return res;
+        }
+    }
+    return "";
+}
+
+// Haetaan kilpailun virallinen alkamispäivämäärä suoraan KITI:n competition API:sta
+async function haeKilpailunPaivamaara(compId) {
+    if (!compId) return "";
+    try {
+        const res = await fetch(`https://kiti.ampumaurheiluliitto.fi/api/competitions/${compId}/`);
+        if (res.ok) {
+            const data = await res.json();
+            return data.start_date || data.competition_start_date || data.date || data.startDate || "";
+        }
+    } catch (e) {
+        // Ignoroidaan yksittäiset virheet
+    }
+    return "";
+}
+
 async function lisaaJaHaeAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
@@ -286,11 +323,33 @@ async function lisaaJaHaeAmpuja() {
 
         const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
 
+        statusEl.innerText = `Haetaan kilpailukohtaisia päivämääriä...`;
+
+        // Kerätään uniikit competition_id:t
+        const compIds = [...new Set(rows.map(r => {
+            if (r.competition_id) return r.competition_id;
+            if (r.competitionId) return r.competitionId;
+            if (typeof r.competition === 'number' || typeof r.competition === 'string') return r.competition;
+            if (r.competition && r.competition.id) return r.competition.id;
+            return null;
+        }).filter(Boolean))];
+
+        // Haetaan jokaiselle kisa-ID:lle virallinen alkamispäivä KITI:stä
+        const compDateMap = {};
+        await Promise.all(compIds.map(async (cId) => {
+            const pvm = await haeKilpailunPaivamaara(cId);
+            if (pvm) compDateMap[cId] = String(pvm).substring(0, 10);
+        }));
+
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
+            const cId = row.competition_id || row.competitionId || (typeof row.competition === 'number' || typeof row.competition === 'string' ? row.competition : (row.competition && row.competition.id ? row.competition.id : null));
+            
+            let pvmTarkka = compDateMap[cId] || kaivaPaivamaara(row);
+
             return {
-                pvm: row.todellinen_pvm || "2026-01-01",
+                pvm: pvmTarkka || "Tuntematon",
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
@@ -355,8 +414,8 @@ function paivitaAmpujatLista() {
 
 function jarjestaPvmMukaan(dataArr, uusinEnsin = true) {
     return [...dataArr].sort((a, b) => {
-        const timeA = new Date(a.pvm).getTime() || 0;
-        const timeB = new Date(b.pvm).getTime() || 0;
+        const timeA = a.pvm !== "Tuntematon" ? new Date(a.pvm).getTime() : 0;
+        const timeB = b.pvm !== "Tuntematon" ? new Date(b.pvm).getTime() : 0;
         return uusinEnsin ? timeB - timeA : timeA - timeB;
     });
 }
@@ -430,7 +489,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO (Uusin kisa ylimpänä täsmällisen päivämäärän mukaan)
+    // TAULUKKO (Uusin kisa ylimpänä täsmällisen kisa-päivämäärän mukaan)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
