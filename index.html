@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v24.0</title>
+    <title>KITI Tulosvertailu v25.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -215,10 +215,7 @@
                 <h2>Lisää ampuja</h2>
                 <label for="uusiId">Sportti-ID</label>
                 <input type="text" id="uusiId" placeholder="Esim. 29364659">
-
-                <label for="uusiNimiInput" style="margin-top: 10px;">Ampujan nimi</label>
-                <input type="text" id="uusiNimiInput" placeholder="Esim. Joni Virtanen">
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Syötä nimi, jos se ei haetuissa tiedoissa näy oikein.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Nimi haetaan automaattisesti Kitistä.</p>
 
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
@@ -289,7 +286,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v24.0_NAME_FALLBACK";
+const KITI_VERSIO = "v25.0_ROOT_NAME_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -321,23 +318,33 @@ function etsiKilpailunNimi(row) {
     return "Kilpailu";
 }
 
-function etsiAmpujanNimi(row) {
-    let etunimi = row.firstName || row.etunimi || (row.shooter && (row.shooter.firstName || row.shooter.etunimi)) || "";
-    let sukunimi = row.lastName || row.sukunimi || (row.shooter && (row.shooter.lastName || row.shooter.sukunimi)) || "";
+function etsiAmpujanNimi(resData, rows, oletusId) {
+    // 1. Tarkistetaan ensin vastauksen pääobjekti (root)
+    let etunimi = resData.firstName || resData.etunimi || (resData.shooter && (resData.shooter.firstName || resData.shooter.etunimi)) || "";
+    let sukunimi = resData.lastName || resData.sukunimi || (resData.shooter && (resData.shooter.lastName || resData.shooter.sukunimi)) || "";
+
+    if (!etunimi && !sukunimi && rows.length > 0) {
+        // 2. Tarkistetaan ensimmäisen tulosrivin tiedot
+        const r = rows[0];
+        etunimi = r.firstName || r.etunimi || (r.shooter && (r.shooter.firstName || r.shooter.etunimi)) || "";
+        sukunimi = r.lastName || r.sukunimi || (r.shooter && (r.shooter.lastName || r.shooter.sukunimi)) || "";
+        
+        if (!etunimi && !sukunimi) {
+            if (r.shooter_name) return String(r.shooter_name);
+            if (r.shooterName) return String(r.shooterName);
+            if (r.competitor && typeof r.competitor === 'object') {
+                if (r.competitor.name) return String(r.competitor.name);
+                if (r.competitor.fullName) return String(r.competitor.fullName);
+            }
+            if (r.athleteName) return String(r.athleteName);
+        }
+    }
 
     if (etunimi || sukunimi) {
         return `${etunimi} ${sukunimi}`.trim();
     }
 
-    if (row.shooter_name) return String(row.shooter_name);
-    if (row.shooterName) return String(row.shooterName);
-    if (row.competitor && typeof row.competitor === 'object') {
-        if (row.competitor.name) return String(row.competitor.name);
-        if (row.competitor.fullName) return String(row.competitor.fullName);
-    }
-    if (row.athleteName) return String(row.athleteName);
-
-    return "";
+    return `Ampuja ${oletusId}`;
 }
 
 function tunnistaLaji(row) {
@@ -404,7 +411,6 @@ async function lisaaJaHaeAmpuja() {
     }
 
     const id = document.getElementById("uusiId").value.trim();
-    let syotettyNimi = document.getElementById("uusiNimiInput").value.trim();
     if (!id) return alert("Sportti-ID vaaditaan!");
 
     const statusEl = document.getElementById("statusText");
@@ -423,13 +429,12 @@ async function lisaaJaHaeAmpuja() {
 
         const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
 
-        if (rows.length === 0) {
+        if (rows.length === 0 && !resData.firstName && !resData.etunimi) {
             throw new Error("Antamallasi Sportti-ID:llä ei löytynyt tuloksia.");
         }
 
-        // Selvitetään nimi: ensin käyttäjän syöttämä, sitten datasta löytyvä, ja viimeisenä varana ID
-        let loytynytNimi = etsiAmpujanNimi(rows[0]);
-        let lopullinenNimi = syotettyNimi !== "" ? syotettyNimi : (loytynytNimi !== "" ? loytynytNimi : `Ampuja ${id}`);
+        // Haetaan nimi automaattisesti päädatasta tai riveiltä
+        let haettuNimi = etsiAmpujanNimi(resData, rows, id);
 
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
@@ -437,7 +442,7 @@ async function lisaaJaHaeAmpuja() {
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
-                ampuja: lopullinenNimi,
+                ampuja: haettuNimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
                 tulos: parseFloat(String(tRaw).replace(",", "."))
@@ -446,17 +451,16 @@ async function lisaaJaHaeAmpuja() {
 
         if (uudet.length > 0) {
             if (!ampujat.some(a => a.id === id)) {
-                ampujat.push({ nimi: lopullinenNimi, id, aktiivinen: true });
+                ampujat.push({ nimi: haettuNimi, id, aktiivinen: true });
                 localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
             }
 
-            tulosData = [...tulosData.filter(d => d.ampuja !== lopullinenNimi), ...uudet];
+            tulosData = [...tulosData.filter(d => d.ampuja !== haettuNimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
-            statusEl.innerText = `Löytyi: ${lopullinenNimi} (${uudet.length} tulosta).`;
+            statusEl.innerText = `Löytyi: ${haettuNimi} (${uudet.length} tulosta).`;
             
             document.getElementById("uusiId").value = "";
-            document.getElementById("uusiNimiInput").value = "";
             paivitaAmpujatLista();
             paivitaValikot(true);
             paivitaNakyma();
@@ -722,7 +726,7 @@ function piirraKaavio(data) {
                 legend: { 
                     display: true, 
                     position: 'top',
-                    labels: { color: '#f3f4f6', boxWidth: 12, font: { size: 11, weight: '600' }}}
+                    labels: { color: '#f3f4f6', boxWidth: 12, font: { size: 11, weight: '600' } }
                 },
                 tooltip: {
                     callbacks: {
