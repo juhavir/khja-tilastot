@@ -32,7 +32,7 @@
         .btn-danger { background-color: var(--danger); margin-top: 0; padding: 6px 10px; font-size: 0.8rem; width: auto; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
-        .stat-box .number { font-size: 1.6rem; font-weight: bold; color: var(--primary-light); }
+        .stat-box .number { font-size: 1.4rem; font-weight: bold; color: var(--primary-light); }
         .stat-box .label { font-size: 0.75rem; color: #64748b; margin-top: 4px; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
@@ -40,6 +40,7 @@
         .ampuja-item { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.9rem; }
         #statusText { font-size: 0.85rem; color: var(--success); margin-top: 10px; font-weight: 600; text-align: center; word-break: break-word; }
         .tag { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .ka-box { text-align: left; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed var(--border); }
     </style>
 </head>
 <body>
@@ -47,7 +48,7 @@
 <div class="container">
     <header>
         <h1>🎯 KITI Tulosvertailu</h1>
-        <p>Hae ja vertaile tuloksia lajin ja sarjan mukaan</p>
+        <p>Vertaile ampujien tuloskehitystä lajeittain ja sarjoittain</p>
     </header>
 
     <div class="grid">
@@ -69,7 +70,7 @@
             </div>
 
             <div class="card">
-                <h2>Suodatus</h2>
+                <h2>Suodatus & Rajaus</h2>
                 <label for="lajiSelect">Laji:</label>
                 <select id="lajiSelect" onchange="paivitaValikot(); paivitaNakyma();">
                     <option value="Kaikki">Kaikki lajit</option>
@@ -79,18 +80,22 @@
                 <select id="sarjaSelect" onchange="paivitaNakyma();">
                     <option value="Kaikki">Kaikki sarjat</option>
                 </select>
+
+                <label for="aikaSelect">Aikaväli:</label>
+                <select id="aikaSelect" onchange="paivitaNakyma();">
+                    <option value="all">Kaikki tulokset</option>
+                    <option value="3">Viimeiset 3 kk</option>
+                    <option value="6">Viimeiset 6 kk</option>
+                    <option value="12">Viimeiset 12 kk</option>
+                </select>
             </div>
         </div>
 
         <div>
             <div class="card">
-                <h2>Yhteenveto</h2>
-                <div class="stats-grid">
-                    <div class="stat-box"><div class="number" id="statKisaLkm">0</div><div class="label">Tuloksia</div></div>
-                    <div class="stat-box"><div class="number" id="statParas">-</div><div class="label">Paras Tulos</div></div>
-                    <div class="stat-box"><div class="number" id="statKeskiarvo">-</div><div class="label">Keskiarvo</div></div>
-                </div>
-                <canvas id="tulosKaavio" height="120"></canvas>
+                <h2>Ampujakohtaiset Keskiarvot</h2>
+                <div id="ampujatStats" class="stats-grid"></div>
+                <canvas id="tulosKaavio" height="130"></canvas>
             </div>
 
             <div class="card">
@@ -109,6 +114,8 @@ let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
+const variPaletti = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
 function alusta() {
     paivitaAmpujatLista();
     paivitaValikot();
@@ -121,20 +128,16 @@ function tunnistaLaji(row) {
     if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
     if (txt.includes("kivääri")) return "Kivääri";
     if (txt.includes("pistooli")) return "Pistooli";
-    
     return row.eventName || row.sportName || row.sport || "Muu laji";
 }
 
 function tunnistaSarja(row) {
-    if (row.category && typeof row.category === 'object') {
-        return row.category.code || row.category.name || "Muu";
-    }
+    if (row.category && typeof row.category === 'object') return row.category.code || row.category.name || "Muu";
     if (row.category) return String(row.category);
     if (row.series) return String(row.series);
     if (row.class_name) return String(row.class_name);
     if (row.className) return String(row.className);
     if (row.category_code) return String(row.category_code);
-    
     return "Muu";
 }
 
@@ -156,16 +159,12 @@ async function lisaaJaHaeAmpuja() {
         }
 
         const resData = await response.json();
-
-        if (!response.ok) {
-            throw new Error(resData.error || `Palvelinvirhe (${response.status})`);
-        }
+        if (!response.ok) throw new Error(resData.error || `Palvelinvirhe (${response.status})`);
 
         const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
 
         const uudet = rows.map(row => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
-            
             return {
                 pvm: String(row.competitionStartDate || row.startDate || row.date || "2026-01-01").substring(0, 10),
                 kilpailu: String(row.competitionName || row.name || "Kilpailu"),
@@ -234,12 +233,10 @@ function paivitaValikot() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
 
-    // 1. Lajit
     const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
     document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
     if (lajit.includes(valittuLaji)) document.getElementById("lajiSelect").value = valittuLaji;
 
-    // 2. Sarjat (suodatetaan valitun lajin mukaan)
     const suodatettuData = tulosData.filter(d => valittuLaji === "Kaikki" || d.laji === valittuLaji);
     const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
     document.getElementById("sarjaSelect").innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
@@ -249,24 +246,47 @@ function paivitaValikot() {
 function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
+    const aikaRajoitus = document.getElementById("aikaSelect").value;
 
-    const data = tulosData.filter(d => 
+    let data = tulosData.filter(d => 
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
         (valittuSarja === "Kaikki" || d.sarja === valittuSarja)
     );
 
-    document.getElementById("statKisaLkm").innerText = data.length;
-    if (data.length > 0) {
-        const tulokset = data.map(d => d.tulos);
-        document.getElementById("statParas").innerText = Math.max(...tulokset);
-        document.getElementById("statKeskiarvo").innerText = (tulokset.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
-    } else {
-        document.getElementById("statParas").innerText = "-";
-        document.getElementById("statKeskiarvo").innerText = "-";
+    // Suodatetaan aikaväli 3kk, 6kk, 12kk
+    if (aikaRajoitus !== "all") {
+        const kk = parseInt(aikaRajoitus);
+        const rajaPvm = new Date();
+        rajaPvm.setMonth(rajaPvm.getMonth() - kk);
+        data = data.filter(d => new Date(d.pvm) >= rajaPvm);
     }
 
+    // Ampujakohtaiset keskiarvot ja parhaat tulokset
+    const nimekkäätAmpujat = [...new Set(data.map(d => d.ampuja))];
+    const statsContainer = document.getElementById("ampujatStats");
+
+    if (nimekkäätAmpujat.length > 0) {
+        statsContainer.innerHTML = nimekkäätAmpujat.map((amp, idx) => {
+            const aTulokset = data.filter(d => d.ampuja === amp).map(d => d.tulos);
+            const ka = (aTulokset.reduce((a, b) => a + b, 0) / aTulokset.length).toFixed(1);
+            const max = Math.max(...aTulokset);
+            const vari = variPaletti[idx % variPaletti.length];
+            return `
+                <div class="stat-box" style="border-top: 4px solid ${vari};">
+                    <div style="font-size:0.85rem; font-weight:bold; color:${vari};">${amp}</div>
+                    <div class="number" style="color:${vari};">${ka}</div>
+                    <div class="label">KA (${aTulokset.length} kisaa)</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">Paras: <b>${max}</b></div>
+                </div>
+            `;
+        }).join("");
+    } else {
+        statsContainer.innerHTML = '<div style="font-size:0.85rem; color:#94a3b8; padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
+    }
+
+    // Taulukko (uusin ensin)
     const tbody = document.getElementById("tulosTaulukko");
-    tbody.innerHTML = data.sort((a,b) => new Date(b.pvm) - new Date(a.pvm)).map(d => `
+    tbody.innerHTML = [...data].sort((a,b) => new Date(b.pvm) - new Date(a.pvm)).map(d => `
         <tr>
             <td>${d.pvm}</td>
             <td style="color: #64748b;">${d.kilpailu}</td>
@@ -282,22 +302,26 @@ function paivitaNakyma() {
 
 function piirraKaavio(data) {
     const ctx = document.getElementById('tulosKaavio').getContext('2d');
+    
+    // JARJESTETAAN TULOKSET GRAAFIIN: Vanhin vasemmalla, uusin oikealla
     const sorted = [...data].sort((a, b) => new Date(a.pvm) - new Date(b.pvm));
 
     if (myChart) { myChart.destroy(); }
 
     const ampujatLista = [...new Set(sorted.map(d => d.ampuja))];
-    const variPaletti = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
 
     const datasets = ampujatLista.map((amp, idx) => {
         const ampujaData = sorted.filter(d => d.ampuja === amp);
+        const vari = variPaletti[idx % variPaletti.length];
         return {
             label: amp,
             data: ampujaData.map(d => ({ x: d.pvm, y: d.tulos })),
-            borderColor: variPaletti[idx % variPaletti.length],
+            borderColor: vari,
+            backgroundColor: vari,
             borderWidth: 2,
-            tension: 0.1,
-            pointRadius: 4
+            tension: 0.15,
+            pointRadius: 5,
+            pointHoverRadius: 7
         };
     });
 
@@ -306,8 +330,25 @@ function piirraKaavio(data) {
         data: { datasets: datasets },
         options: {
             responsive: true,
-            plugins: { legend: { display: true, position: 'top' } },
-            scales: { x: { type: 'category' } }
+            plugins: { 
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw.y} pistettä`;
+                        }
+                    }
+                }
+            },
+            scales: { 
+                x: { 
+                    type: 'category',
+                    title: { display: true, text: 'Aika (Vanhin -> Uusin)' }
+                },
+                y: {
+                    title: { display: true, text: 'Tulos' }
+                }
+            }
         }
     });
 }
