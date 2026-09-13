@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     const sporttiId = req.query.id;
     if (!sporttiId) {
@@ -39,7 +40,6 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}.` });
         }
 
-        // Haetaan tulokset KITI:n omalla tupla-alaviiva-järjestyksellä (uusin kisa alussa)
         const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition__start_date`;
         const resultsRes = await fetch(resultsUrl, { headers });
 
@@ -50,15 +50,19 @@ export default async function handler(req, res) {
         const resultsData = await resultsRes.json();
         const rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
 
+        // Kaivetaan kilpailupäivä varmuudella KITI-tietueesta
         const formatoidutRows = rows.map(row => {
-            let pvm = row.competition_start_date || row.start_date || "";
-            if (!pvm && row.competition && typeof row.competition === 'object') {
+            let pvm = "";
+            if (row.competition && typeof row.competition === 'object') {
                 pvm = row.competition.start_date || row.competition.competition_start_date || row.competition.date || "";
+            }
+            if (!pvm) {
+                pvm = row.competition_start_date || row.start_date || row.startDate || row.date || "";
             }
 
             return {
                 ...row,
-                todellinen_pvm: String(pvm).substring(0, 10)
+                kiti_pvm_tarkka: String(pvm).substring(0, 10)
             };
         });
 
