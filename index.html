@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v92.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v93.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -260,6 +260,15 @@
         .tag { background: var(--input-bg); color: var(--text-main); padding: 2px 6px; font-size: 0.7rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
         .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid var(--card-border); }
 
+        .kiti-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .kiti-link:hover {
+            text-decoration: underline;
+        }
+
         .info-box { 
             background: rgba(251, 191, 36, 0.1); 
             border: 1px solid rgba(251, 191, 36, 0.3); 
@@ -375,7 +384,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v92.0_STATISTICS_ENDPOINT_SUPPORT";
+const KITI_VERSIO = "v93.0_KITI_LINK_SUPPORT";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -435,6 +444,16 @@ function etsiKilpailunNimi(row) {
     if (row.competitionName) return String(row.competitionName);
     if (row.name) return String(row.name);
     return "Kilpailu";
+}
+
+function etsiKilpailuId(row) {
+    if (row.competition && typeof row.competition === 'object') {
+        const c = row.competition;
+        if (c.id) return c.id;
+    }
+    if (row.competition_id) return row.competition_id;
+    if (row.competitionId) return row.competitionId;
+    return null;
 }
 
 function muunnaLajiksi(arvo) {
@@ -569,6 +588,7 @@ async function lisaaJaHaeAmpuja() {
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
+                kisaId: etsiKilpailuId(row),
                 ampuja: nimi,
                 laji: lueLaji(row),
                 sarja: lueSarja(row),
@@ -722,7 +742,6 @@ function laskeHajonta(arr) {
     return Math.sqrt(neliotSumma / arr.length).toFixed(1);
 }
 
-// Haetaan statistiikkarajapinnasta sijoitus valitulle lajille ja sarjalle
 async function haeTilastoSijoitus(ampujanNimi, laji, sarja, callback) {
     if (laji === "Kaikki" || sarja === "Kaikki") {
         callback("-");
@@ -737,7 +756,6 @@ async function haeTilastoSijoitus(ampujanNimi, laji, sarja, callback) {
         const data = await resp.json();
         const tulokset = Array.isArray(data) ? data : (data.results || data.content || []);
         
-        // Suodatetaan vastaamaan lajia, sarjaa ja ampujaa, järjestetään tuloksen mukaan laskevasti
         const sopivat = tulokset.filter(r => {
             const rLaji = lueLaji(r);
             const rSarja = lueSarja(r);
@@ -784,7 +802,6 @@ async function paivitaNakyma() {
     const statsContainer = document.getElementById("ampujatStats");
 
     if (aktiivisetAmpujat.length > 0) {
-        // Alustava renderöinti ilman statistiikkasijoitusta, joka päivittyy asynkronisesti
         statsContainer.innerHTML = aktiivisetAmpujat.map((ampObj, idx) => {
             const amp = ampObj.nimi;
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
@@ -850,7 +867,6 @@ async function paivitaNakyma() {
             `;
         }).join("");
 
-        // Haetaan taustalla sijoitukset tilastosivun kautta
         aktiivisetAmpujat.forEach((ampObj, idx) => {
             haeTilastoSijoitus(ampObj.nimi, valittuLaji, valittuSarja, (sijaStr) => {
                 const sijaEl = document.getElementById(`stat_sija_${idx}`);
@@ -876,16 +892,22 @@ async function paivitaNakyma() {
     }
 
     const tbody = document.getElementById("tulosTaulukko");
-    tbody.innerHTML = jarjestaPvmMukaan(taulukkoData, true).map((d) => `
-        <tr>
-            <td><b>${d.pvm}</b></td>
-            <td style="color: var(--text-muted);">${d.kilpailu}</td>
-            <td><b>${d.ampuja}</b></td>
-            <td><span class="tag tag-laji">${d.laji}</span></td>
-            <td><span class="tag">${d.sarja}</span></td>
-            <td><b>${d.tulos}</b> ${d.sija ? `(Sija ${d.sija})` : ''}</td>
-        </tr>
-    `).join("");
+    tbody.innerHTML = jarjestaPvmMukaan(taulukkoData, true).map((d) => {
+        let kilpailuSolu = d.kilpailu;
+        if (d.kisaId) {
+            kilpailuSolu = `<a href="https://kiti.ampumaurheiluliitto.fi/#/competition/${d.kisaId}" target="_blank" class="kiti-link" title="Avaa KITI-kilpailusivu">${d.kilpailu} ↗</a>`;
+        }
+        return `
+            <tr>
+                <td><b>${d.pvm}</b></td>
+                <td>${kilpailuSolu}</td>
+                <td><b>${d.ampuja}</b></td>
+                <td><span class="tag tag-laji">${d.laji}</span></td>
+                <td><span class="tag">${d.sarja}</span></td>
+                <td><b>${d.tulos}</b> ${d.sija ? `(Sija ${d.sija})` : ''}</td>
+            </tr>
+        `;
+    }).join("");
 
     piirraKaavio(taulukkoData, valittuLaji, valittuSarja);
 }
