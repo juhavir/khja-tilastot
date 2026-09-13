@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v21.0</title>
+    <title>KITI Tulosvertailu v23.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -214,8 +214,8 @@
             <div class="card">
                 <h2>Lisää ampuja</h2>
                 <label for="uusiId">Sportti-ID</label>
-                <input type="text" id="uusiId" placeholder="Esim. 60332562">
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Nimi haetaan automaattisesti tuloksista.</p>
+                <input type="text" id="uusiId" placeholder="Esim. 29364659">
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Nimi haetaan automaattisesti Kitistä.</p>
 
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
@@ -286,7 +286,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v21.0_AUTO_NAME";
+const KITI_VERSIO = "v23.0_CLEAN_NAME";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -319,13 +319,23 @@ function etsiKilpailunNimi(row) {
 }
 
 function etsiAmpujanNimi(row, oletusId) {
+    // Tarkistetaan suoraan Kitin datarakenteen mukaiset etu- ja sukunimikentät
+    let etunimi = row.firstName || row.etunimi || (row.shooter && (row.shooter.firstName || row.shooter.etunimi)) || "";
+    let sukunimi = row.lastName || row.sukunimi || (row.shooter && (row.shooter.lastName || row.shooter.sukunimi)) || "";
+
+    if (etunimi || sukunimi) {
+        return `${etunimi} ${sukunimi}`.trim();
+    }
+
+    // Varatarkistukset muille yleisille kentille
     if (row.shooter_name) return String(row.shooter_name);
     if (row.shooterName) return String(row.shooterName);
-    if (row.name && !row.competition_name && !row.competitionName) return String(row.name);
     if (row.competitor && typeof row.competitor === 'object') {
         if (row.competitor.name) return String(row.competitor.name);
         if (row.competitor.fullName) return String(row.competitor.fullName);
     }
+    if (row.athleteName) return String(row.athleteName);
+
     return `Ampuja ${oletusId}`;
 }
 
@@ -415,7 +425,7 @@ async function lisaaJaHaeAmpuja() {
             throw new Error("Antamallasi Sportti-ID:llä ei löytynyt tuloksia.");
         }
 
-        // Otetaan nimi automaattisesti ensimmäisestä rivistä
+        // Haetaan nimi automaattisesti Kitin tietojen mukaan
         let haettuNimi = etsiAmpujanNimi(rows[0], id);
 
         const uudet = rows.map((row) => {
