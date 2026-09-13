@@ -2,8 +2,8 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-    const id = req.query.id;
-    if (!id) {
+    const sporttiId = req.query.id;
+    if (!sporttiId) {
         return res.status(400).json({ error: 'Sportti-ID puuttuu' });
     }
 
@@ -13,52 +13,45 @@ export default async function handler(req, res) {
     };
 
     try {
-        // 1. Haetaan suoraan tulokset Sportti-ID:llä tai urheilijahaulla
-        let resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete_id=${id}&ordering=-competition_start_date`;
-        let resultsRes = await fetch(resultsUrl, { headers });
-        let resultsData = await resultsRes.json();
+        // 1. Etsitään ampuja ja hänen sisäinen KITI-ID:nsä Sportti-ID:llä
+        const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${sporttiId}`;
+        const searchRes = await fetch(searchUrl, { headers });
         
-        let rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
+        if (!searchRes.ok) {
+            return res.status(searchRes.status).json({ error: `KITI-haku epäonnistui (koodi ${searchRes.status})` });
+        }
 
-        // 2. Jos suora haku ei tärpännyt, etsitään sisäinen ID urheilijalistauksesta
-        if (rows.length === 0) {
-            const searchUrl = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?sportti_id=${id}`;
-            const searchRes = await fetch(searchUrl, { headers });
-            
-            if (searchRes.ok) {
-                const searchData = await searchRes.json();
-                const athletes = Array.isArray(searchData) ? searchData : (searchData.results || searchData.content || searchData.data || []);
-                
-                if (athletes.length > 0 && (athletes[0].id || athletes[0].personId)) {
-                    const internalId = athletes[0].id || athletes[0].personId;
-                    resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition_start_date`;
-                    resultsRes = await fetch(resultsUrl, { headers });
-                    resultsData = await resultsRes.json();
-                    rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
-                }
+        const searchData = await searchRes.json();
+        const athletes = Array.isArray(searchData) ? searchData : (searchData.results || searchData.content || searchData.data || []);
+
+        // Etsitään tasan se ampuja, jonka sportti_id tai muu id täsmää syötettyyn numeroon
+        let internalId = null;
+        for (let ath of athletes) {
+            if (String(ath.sportti_id) === String(sporttiId) || String(ath.license_code) === String(sporttiId) || String(ath.id) === String(sporttiId)) {
+                internalId = ath.id || ath.person_id || ath.personId;
+                break;
             }
         }
 
-        // 3. Kolmas oljenkorsi: yleishaku
-        if (rows.length === 0) {
-            const searchUrl2 = `https://kiti.ampumaurheiluliitto.fi/api/athletes/?search=${id}`;
-            const searchRes2 = await fetch(searchUrl2, { headers });
-            if (searchRes2.ok) {
-                const searchData2 = await searchRes2.json();
-                const athletes2 = Array.isArray(searchData2) ? searchData2 : (searchData2.results || searchData2.content || searchData2.data || []);
-                if (athletes2.length > 0 && (athletes2[0].id || athletes2[0].personId)) {
-                    const internalId = athletes2[0].id || athletes2[0].personId;
-                    resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition_start_date`;
-                    resultsRes = await fetch(resultsUrl, { headers });
-                    resultsData = await resultsRes.json();
-                    rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
-                }
-            }
+        // Jos tarkkaa täsmäystä ei löytynyt vertailussa, otetaan ensimmäinen hakutulos jos sellainen tuli
+        if (!internalId && athletes.length > 0) {
+            internalId = athletes[0].id || athletes[0].person_id || athletes[0].personId;
         }
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: `Ei tuloksia Sportti-ID:llä ${id}. Varmista numero.` });
+        if (!internalId) {
+            return res.status(404).json({ error: `Ei löytynyt ampujaa Sportti-ID:llä ${sporttiId}. Tarkista numero.` });
         }
+
+        // 2. Haetaan viralliset tulokset täsmällisellä sisäisellä ID:llä
+        const resultsUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?athlete=${internalId}&ordering=-competition_start_date`;
+        const resultsRes = await fetch(resultsUrl, { headers });
+
+        if (!resultsRes.ok) {
+            return res.status(resultsRes.status).json({ error: `Tulosten haku epäonnistui (koodi ${resultsRes.status})` });
+        }
+
+        const resultsData = await resultsRes.json();
+        const rows = Array.isArray(resultsData) ? resultsData : (resultsData.results || resultsData.content || resultsData.data || []);
 
         return res.status(200).json(rows);
 
