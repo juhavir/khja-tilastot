@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v87.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v89.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v87.0_EXACT_TYPE_INFO_NAME";
+const KITI_VERSIO = "v89.0_NUMERIC_MAPPING_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -386,6 +386,16 @@ let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
 const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
+
+// Virallinen numeerinen lajikartta (päivitettävissä tarpeen mukaan)
+const lajiMap = {
+    "1": "10m ilmakivääri",
+    "2": "10m ilmapistooli",
+    "8": "Pienoispistooli",
+    "9": "Vapaapistooli",
+    "10": "Isopistooli",
+    "11": "Vakiopistooli"
+};
 
 function alusta() {
     const tallennettuTeema = localStorage.getItem("kiti_teema") || "dark";
@@ -428,22 +438,61 @@ function etsiKilpailunNimi(row) {
     return "Kilpailu";
 }
 
+function muunnaLajiksi(arvo) {
+    if (arvo === undefined || arvo === null) return null;
+    const str = String(arvo).trim();
+    // Jos kyseessä on pelkkä numero, tarkistetaan löytyykö kartasta
+    if (lajiMap[str]) {
+        return lajiMap[str];
+    }
+    // Jos se ei ole pelkkä numero, palautetaan sellaisenaan
+    if (isNaN(str)) {
+        return str;
+    }
+    return null;
+}
+
 function lueLaji(row) {
-    // Luetaan tarkasti competition.type_info.name kuten kuvassa 7 näkyy
+    // 1. Tarkistetaan competition.type_info
     if (row.competition && typeof row.competition === 'object') {
         const c = row.competition;
-        if (c.type_info && typeof c.type_info === 'object' && c.type_info.name) {
-            return String(c.type_info.name).trim();
+        if (c.type_info) {
+            if (typeof c.type_info === 'object' && c.type_info.name) {
+                const nimi = muunnaLajiksi(c.type_info.name);
+                if (nimi) return nimi;
+            } else {
+                const nimi = muunnaLajiksi(c.type_info);
+                if (nimi) return nimi;
+            }
+        }
+        if (c.type !== undefined) {
+            const nimi = muunnaLajiksi(c.type);
+            if (nimi) return nimi;
         }
     }
-    // Varakentät, jos tyyppitietoa ei löydy type_info:sta
-    const mahdolliset = [row.type, row.disciplineName, row.sportName];
+
+    // 2. Tarkistetaan suorat rivin kentät
+    const mahdolliset = [row.type, row.disciplineName, row.sportName, row.sport, row.discipline];
     for (const m of mahdolliset) {
-        if (m) {
-            if (typeof m === 'object' && m.name) return String(m.name).trim();
-            if (typeof m === 'string' && m.trim().length > 0) return m.trim();
+        if (m !== undefined && m !== null) {
+            if (typeof m === 'object') {
+                const nimi = muunnaLajiksi(m.name || m.title || m.code);
+                if (nimi) return nimi;
+            } else {
+                const nimi = muunnaLajiksi(m);
+                if (nimi) return nimi;
+            }
         }
     }
+
+    // 3. Viimeisenä turvana tutkitaan kilpailun nimi
+    const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
+    if (kisaNimi.includes("ilmakivääri")) return "10m ilmakivääri";
+    if (kisaNimi.includes("ilmapistooli")) return "10m ilmapistooli";
+    if (kisaNimi.includes("pienoispistooli")) return "Pienoispistooli";
+    if (kisaNimi.includes("vapaapistooli")) return "Vapaapistooli";
+    if (kisaNimi.includes("isopistooli")) return "Isopistooli";
+
     return "Muu laji";
 }
 
@@ -461,6 +510,17 @@ function lueSarja(row) {
         if (c.category) return String(c.category).trim();
     }
     return "Muu";
+}
+
+function lueSija(row) {
+    const sijaArvot = [row.position, row.position_pre, row.rank, row.placement];
+    for (const s of sijaArvot) {
+        if (s !== undefined && s !== null && s !== "") {
+            const parsed = parseInt(s, 10);
+            if (!isNaN(parsed)) return parsed;
+        }
+    }
+    return null;
 }
 
 function tunnistaKisanPaivamaara(row) {
@@ -516,11 +576,6 @@ async function lisaaJaHaeAmpuja() {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", "."));
 
-            let sija = null;
-            if (row.rank !== undefined) sija = parseInt(row.rank, 10);
-            else if (row.position !== undefined) sija = parseInt(row.position, 10);
-            else if (row.placement !== undefined) sija = parseInt(row.placement, 10);
-
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
@@ -528,7 +583,7 @@ async function lisaaJaHaeAmpuja() {
                 laji: lueLaji(row),
                 sarja: lueSarja(row),
                 tulos: tulos,
-                sija: !isNaN(sija) ? sija : null
+                sija: lueSija(row)
             };
         }).filter(r => r.tulos > 0);
 
