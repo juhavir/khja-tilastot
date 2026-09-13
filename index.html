@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v50.0</title>
+    <title>KITI Tulosvertailu v51.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v50.0_ALLTIME_RANK";
+const KITI_VERSIO = "v51.0_RESULTLIST_ID";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -308,7 +308,7 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Hakee KITI:n /api/resultlist/-rajapinnasta kaikkien aikojen listan, poimii ampujien parhaat tulokset ja laskee sijoituksen
+// Hakee oikean kaikkien aikojen sijoituksen KITI:n /api/resultlist/ -rajapinnasta käyttäen oikeita parametreja
 async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoodi) {
     if (!sportId || !sarjaKoodi || sarjaKoodi === "Kaikki") return "-";
 
@@ -318,8 +318,8 @@ async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoo
     }
 
     try {
-        // Haetaan tarpeeksi suuri määrä tuloksia (limit=300), että saadaan kattava otos sarjan tuloslistasta
-        const url = `/api/resultlist/?sport=${sportId}&category=${encodeURIComponent(sarjaKoodi)}&limit=300&nocache=${Date.now()}`;
+        // Haetaan juuri sillä oikealla parametrirakenteella, joka näkyi Network-välilehdessä
+        const url = `/api/resultlist/?fields!=partial&sport=${sportId}&category=${encodeURIComponent(sarjaKoodi)}&level=1,2,3,4,5,6,7,8,9,10,11,12&limit=250&nocache=${Date.now()}`;
         const response = await fetch(url);
         if (!response.ok) return "-";
 
@@ -348,12 +348,12 @@ async function haeKitiKaikkienAikojenParasSijoitus(ampujaNimi, sportId, sarjaKoo
             }
         });
 
-        // 2. Muutetaan listaksi ja järjestetään parhaan tuloksen mukaan laskevasti (suurin tulos = 1. sija)
+        // 2. Järjestetään parhaat tulokset laskevasti (suurin tulos = 1. sija)
         const rankingLista = Object.entries(parhaatPerAmpuja)
             .map(([nimi, tulos]) => ({ nimi, tulos }))
             .sort((a, b) => b.tulos - a.tulos);
 
-        // 3. Etsitään ampujan sijoitus tältä kaikkien aikojen parhaiden listalta
+        // 3. Etsitään ampujan sijoitus listalta
         const etsittavaNimi = ampujaNimi.trim().toLowerCase();
         const sijaIndeksi = rankingLista.findIndex(r => r.nimi === etsittavaNimi);
 
@@ -413,6 +413,8 @@ function tunnistaLaji(row) {
 }
 
 function tunnistaSarja(row) {
+    // Jos riviltä löytyy suoraan sarjakoodi (kuten "14T"), otetaan se talteen
+    if (row.category && typeof row.category === 'string') return row.category;
     if (row.category && typeof row.category === 'object') return row.category.code || row.category.name || "Muu";
     if (row.category) return String(row.category);
     if (row.series) return String(row.series);
