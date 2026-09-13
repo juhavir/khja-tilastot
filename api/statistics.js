@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Sallitaan CORS-pyynnöt omalta sovellukselta
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -17,10 +16,11 @@ export default async function handler(req, res) {
 
   const sportParam = sport || '1';
   const categoryParam = category || '8';
-  const levelParam = level || '11,10,8';
   const pageParam = page || '1';
 
-  const targetUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?fields!=partial&sport=${sportParam}&category=${categoryParam}&level=${levelParam}&type=1&limit=25&page=${pageParam}`;
+  // Jos level-parametria ei anneta erikseen, ei rajata luokituksia (kaikki luokitukset mukana)
+  const levelQuery = level ? `&level=${level}` : '';
+  const targetUrl = `https://kiti.ampumaurheiluliitto.fi/api/resultlist/?fields!=partial&sport=${sportParam}&category=${categoryParam}${levelQuery}&type=1&limit=25&page=${pageParam}`;
 
   try {
     const kitiResponse = await fetch(targetUrl, {
