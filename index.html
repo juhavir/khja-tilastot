@@ -423,7 +423,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO: Aito kisa-pvm mukaan (uusin kisa esim. 2026-04-10 ensimmaisena)
+    // TAULUKKO (Uusin kisa esim. 2026-08-15 ylimpänä)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
