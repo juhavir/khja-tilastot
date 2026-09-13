@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu</title>
+    <title>KITI Tulosvertailu v16.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -128,7 +128,7 @@
         }
         .btn-danger:hover { background-color: var(--danger); color: white; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
 
         .stat-box { 
             background: var(--input-bg); 
@@ -139,10 +139,13 @@
 
         .stat-header { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
         .sub-stat { display: flex; flex-direction: column; }
-        .sub-stat .val { font-weight: 800; font-size: 1.05rem; color: var(--text-main); }
-        .sub-stat .lbl { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
+        .sub-stat .val { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
+        .sub-stat .lbl { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
+
+        .extra-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats b { color: var(--text-main); display: block; font-size: 0.85rem; }
 
         .chart-container { position: relative; width: 100%; height: 320px; }
 
@@ -246,7 +249,7 @@
             </div>
 
             <div class="card">
-                <h2>Keskiarvot & Trendi</h2>
+                <h2>Keskiarvot & Tilastot</h2>
                 <div id="ampujatStats" class="stats-grid"></div>
                 <div class="chart-container">
                     <canvas id="tulosKaavio"></canvas>
@@ -276,8 +279,7 @@
 </div>
 
 <script>
-// Pakotetaan vanhan välimuistin tyhjennys uuden version myötä
-const KITI_VERSIO = "v14.0_FORCE_RESET";
+const KITI_VERSIO = "v16.0_MAKUU_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -312,30 +314,28 @@ function etsiKilpailunNimi(row) {
 function tunnistaLaji(row) {
     const txt = JSON.stringify(row).toLowerCase();
     const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
-    
     const tVal = parseFloat(String(row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0))).replace(",", "."));
 
     if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) {
         return "Ilmakivääri";
     }
     
-    // Tarkistetaan onko kyseessä pienoiskivääri tai 50m/300m
+    // Tarkistetaan pienoiskivääri / 50m / 300m
     if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        // Jos tulos on selvästi yli 700 tai nimessä mainitaan asento/3x20/3x40
-        if (tVal > 700 || txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x")) {
+        // Vain jos tulos on yli 800 TAI nimenomaisesti mainitaan asento/3x, kyseessä on asento. Muuten se on makuu.
+        const onAsentoNimessa = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
+        
+        if (tVal > 800 || (onAsentoNimessa && tVal > 700)) {
             return "Pienoiskivääri 3x20/3x40 (Asento)";
         }
-        if (txt.includes("makuu") || kisaNimi.includes("makuu")) {
-            return "Pienoiskivääri Makuu";
-        }
-        // Oletus pienoiskiväärille
-        return tVal > 700 ? "Pienoiskivääri 3x20/3x40 (Asento)" : "Pienoiskivääri Makuu";
+        return "Pienoiskivääri Makuu";
     }
 
     if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
     if (txt.includes("pistooli")) return "Pistooli";
+    
     if (txt.includes("kivääri")) {
-        return tVal > 700 ? "Kivääri 3x20/3x40 (Asento)" : "Kivääri Makuu";
+        return (tVal > 800) ? "Kivääri 3x20/3x40 (Asento)" : "Kivääri Makuu";
     }
 
     return row.eventName || row.sportName || row.sport || "Muu laji";
@@ -512,6 +512,13 @@ function laskeKA(arr) {
     return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
 }
 
+function laskeHajonta(arr) {
+    if (!arr || arr.length < 2) return "0.0";
+    const ka = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const neliotSumma = arr.reduce((a, b) => a + Math.pow(b - ka, 2), 0);
+    return Math.sqrt(neliotSumma / arr.length).toFixed(1);
+}
+
 function paivitaNakyma() {
     const valittuLaji = document.getElementById("lajiSelect").value;
     const valittuSarja = document.getElementById("sarjaSelect").value;
@@ -544,16 +551,34 @@ function paivitaNakyma() {
             const kaV10 = laskeKA(aTulokset.slice(0, 10));
             const kaV15 = laskeKA(aTulokset.slice(0, 15));
 
-            const max = aTulokset.length > 0 ? Math.max(...aTulokset) : "-";
+            const pb = aTulokset.length > 0 ? Math.max(...aTulokset) : "-";
+            
+            const nykyVuosi = new Date().getFullYear().toString();
+            const kaudenTulokset = aTuloksetRivit.filter(d => d.pvm.startsWith(nykyVuosi)).map(d => d.tulos);
+            const sb = kaudenTulokset.length > 0 ? Math.max(...kaudenTulokset) : pb;
+
+            let trendiTxt = "-";
+            if (aTulokset.length >= 2) {
+                const ero = (aTulokset[0] - aTulokset[1]).toFixed(1);
+                trendiTxt = ero > 0 ? `+${ero}` : `${ero}`;
+            }
+
+            const hajonta = laskeHajonta(aTulokset);
             const vari = variPaletti[idx % variPaletti.length];
+
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
-                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aTulokset.length} kisaa | Paras: ${max})</span></div>
+                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aTulokset.length} kisaa)</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
                         <div class="sub-stat"><span class="val">${kaV5}</span><span class="lbl">V5</span></div>
                         <div class="sub-stat"><span class="val">${kaV10}</span><span class="lbl">V10</span></div>
                         <div class="sub-stat"><span class="val">${kaV15}</span><span class="lbl">V15</span></div>
+                    </div>
+                    <div class="extra-stats">
+                        <div>Ennätys (PB)<b>${pb}</b></div>
+                        <div>Kauden paras<b>${sb}</b></div>
+                        <div>Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
                 </div>
             `;
