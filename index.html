@@ -276,7 +276,8 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v13.0_RIFLE_FIX";
+// Pakotetaan vanhan välimuistin tyhjennys uuden version myötä
+const KITI_VERSIO = "v14.0_FORCE_RESET";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -312,29 +313,30 @@ function tunnistaLaji(row) {
     const txt = JSON.stringify(row).toLowerCase();
     const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
     
-    // Tarkat kiväärilajit: Ilma, 50m/pienoiskiväärin asento (3x20, 3x40, asentokilpailu) tai makuu
+    const tVal = parseFloat(String(row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0))).replace(",", "."));
+
     if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) {
         return "Ilmakivääri";
     }
     
+    // Tarkistetaan onko kyseessä pienoiskivääri tai 50m/300m
     if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        if (txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || txt.includes("3 kpl") || kisaNimi.includes("asento") || kisaNimi.includes("3x")) {
+        // Jos tulos on selvästi yli 700 tai nimessä mainitaan asento/3x20/3x40
+        if (tVal > 700 || txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || kisaNimi.includes("asento") || kisaNimi.includes("3x")) {
             return "Pienoiskivääri 3x20/3x40 (Asento)";
         }
         if (txt.includes("makuu") || kisaNimi.includes("makuu")) {
             return "Pienoiskivääri Makuu";
         }
-        // Jos tulos on yli 800 pistettä, se on lähes varmasti asentokilpailu (3x40 / 3x20)
-        const tVal = parseFloat(String(row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0))).replace(",", "."));
-        if (tVal > 800) {
-            return "Pienoiskivääri 3x20/3x40 (Asento)";
-        }
-        return "Pienoiskivääri Makuu";
+        // Oletus pienoiskiväärille
+        return tVal > 700 ? "Pienoiskivääri 3x20/3x40 (Asento)" : "Pienoiskivääri Makuu";
     }
 
     if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
     if (txt.includes("pistooli")) return "Pistooli";
-    if (txt.includes("kivääri")) return "Kivääri";
+    if (txt.includes("kivääri")) {
+        return tVal > 700 ? "Kivääri 3x20/3x40 (Asento)" : "Kivääri Makuu";
+    }
 
     return row.eventName || row.sportName || row.sport || "Muu laji";
 }
