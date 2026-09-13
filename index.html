@@ -276,7 +276,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v11.0_MODERN";
+const KITI_VERSIO = "v12.0_SPORT_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -310,10 +310,22 @@ function etsiKilpailunNimi(row) {
 
 function tunnistaLaji(row) {
     const txt = JSON.stringify(row).toLowerCase();
+    
+    // Tarkat kiväärilajit (asento, makuu, pienoiskivääri, ilma)
     if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) return "Ilmakivääri";
+    if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m")) {
+        if (txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || txt.includes("40") || txt.includes("kivääri 3")) {
+            return "Pienoiskivääri 3x20/3x40";
+        }
+        if (txt.includes("makuu")) {
+            return "Pienoiskivääri Makuu";
+        }
+        return "Pienoiskivääri";
+    }
     if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
-    if (txt.includes("kivääri")) return "Kivääri";
     if (txt.includes("pistooli")) return "Pistooli";
+    if (txt.includes("kivääri")) return "Kivääri";
+
     return row.eventName || row.sportName || row.sport || "Muu laji";
 }
 
@@ -339,7 +351,6 @@ function tunnistaKisanPaivamaara(row) {
 
     if (pvm) return String(pvm).substring(0, 10);
 
-    // Varaksi haetaan datasta vuosilukua ja kuukautta
     const txt = JSON.stringify(row);
     const isoMatch = txt.match(/\b(202[4-6]-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01]))\b/);
     if (isoMatch) return isoMatch[1];
