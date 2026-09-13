@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v80.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v81.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v80.0_EXACT_MAPPING";
+const KITI_VERSIO = "v81.0_DIRECT_TYPE_FIELD";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -386,35 +386,6 @@ let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
 const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
-
-// Virallinen koodistomuunnos KITI:n ID:ille, numeroille ja tunnisteille (ei arvailua)
-const KITI_LAJI_MAP = {
-    // Esimerkkejä virallisista ID-koodidta / numeroista (laajenna tarvittaessa)
-    "1": "Ilmakivääri",
-    "2": "Ilmapistooli",
-    "3": "Pienoiskivääri Makuu",
-    "4": "Pienoiskivääri Asento (3x20/3x40)",
-    "5": "Vapaapistooli",
-    "6": "Pienoispistooli",
-    "7": "Isopistooli",
-    "8": "Vakiopistooli",
-    "9": "Olympiapistooli",
-    "10": "Skeet",
-    "11": "Trap"
-};
-
-const KITI_SARJA_MAP = {
-    "Y": "Yleinen",
-    "M": "Miehet",
-    "N": "Naiset",
-    "Y16": "Y16",
-    "Y18": "Y18",
-    "Y20": "Y20",
-    "Y50": "Y50",
-    "Y60": "Y60",
-    "Y70": "Y70",
-    "N50": "N50"
-};
 
 function alusta() {
     const tallennettuTeema = localStorage.getItem("kiti_teema") || "dark";
@@ -457,31 +428,23 @@ function etsiKilpailunNimi(row) {
     return "Kilpailu";
 }
 
-function ratkaiseLajiTarkasti(row) {
-    // 1. Tarkistetaan numerokoodi tai ID suoraan virallisesta taulukosta
-    const sportId = String(row.sport_id || row.sportId || row.discipline_id || row.disciplineId || row.event_id || row.eventId || "");
-    if (sportId && KITI_LAJI_MAP[sportId]) {
-        return KITI_LAJI_MAP[sportId];
+function lueLaji(row) {
+    // Luetaan suoraan KITI:n tarjoama tyyppi- tai lajikenttä (esim. "Tyyppi"-sarake)
+    const lajiArvo = row.type || row.eventType || row.event_name || row.eventName || row.sport_name || row.sportName || row.discipline || row.discipline_name;
+    if (lajiArvo && typeof lajiArvo === 'string' && lajiArvo.trim().length > 0) {
+        return lajiArvo.trim();
     }
-
-    // 2. Luetaan suoraan KITI:n palauttama selkokielinen kenttä
-    const apiLaji = row.event_name || row.eventName || row.sport_name || row.sportName || row.sport || row.discipline || row.discipline_name;
-    if (apiLaji && typeof apiLaji === 'string' && apiLaji.trim().length > 1) {
-        return apiLaji.trim();
-    }
-
-    return "Tuntematon laji";
+    return "Muu laji";
 }
 
-function ratkaiseSarjaTarkasti(row) {
-    const rawCat = row.category || row.series || row.class_name || row.className || row.category_code;
-    if (rawCat) {
-        if (typeof rawCat === 'object') {
-            const code = rawCat.code || rawCat.name || "";
-            return KITI_SARJA_MAP[code] || code || "Muu";
+function lueSarja(row) {
+    // Luetaan suoraan KITI:n tarjoama sarjakenttä (esim. "Sarja"-sarake)
+    const sarjaArvo = row.category || row.series || row.class_name || row.className || row.category_code;
+    if (sarjaArvo) {
+        if (typeof sarjaArvo === 'object') {
+            return sarjaArvo.name || sarjaArvo.code || "Muu";
         }
-        const strCat = String(rawCat).trim();
-        return KITI_SARJA_MAP[strCat] || strCat;
+        return String(sarjaArvo).trim();
     }
     return "Muu";
 }
@@ -548,8 +511,8 @@ async function lisaaJaHaeAmpuja() {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
-                laji: ratkaiseLajiTarkasti(row),
-                sarja: ratkaiseSarjaTarkasti(row),
+                laji: lueLaji(row),
+                sarja: lueSarja(row),
                 tulos: tulos,
                 sija: !isNaN(sija) ? sija : null
             };
