@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v36.0</title>
+    <title>KITI Tulosvertailu v37.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v36.0_DYNAMIC_FILTER_RANK";
+const KITI_VERSIO = "v37.0_ALL_LEVELS_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -308,7 +308,7 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan tarkka sijoitus KITI-tilastosta dynaamisesti valituilla parametreilla
+// Haetaan tarkka sijoitus KITI-tilastosta kaikilla kilpailuluokituksilla
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     if (!sportId || !categoryId) return "-";
 
@@ -316,11 +316,11 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     if (sijoitusCache[key]) return sijoitusCache[key];
 
     try {
-        const osat = ampujaNimi.trim().toLowerCase().split(" ");
-        const sukunimi = osat[osat.length - 1];
+        const etsittavaKokoNimi = ampujaNimi.trim().toLowerCase();
 
-        for (let page = 1; page <= 6; page++) {
-            const url = `/api/statistics?sport=${sportId}&category=${categoryId}&level=11,10,8&page=${page}&nocache=${Date.now()}`;
+        // Selaillaan sivuja (ilman level-rajausta, eli mukana kaikki luokitukset)
+        for (let page = 1; page <= 8; page++) {
+            const url = `/api/statistics?sport=${sportId}&category=${categoryId}&page=${page}&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
 
@@ -330,9 +330,17 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
 
             for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
-                const rowStr = JSON.stringify(r).toLowerCase();
+                
+                const ampujaNimiKiti = (
+                    r.shooter_name || 
+                    r.competitor_name || 
+                    r.name || 
+                    (r.shooter && (r.shooter.name || `${r.shooter.first_name || ''} ${r.shooter.last_name || ''}`)) || 
+                    (r.competitor && (r.competitor.name || `${r.competitor.first_name || ''} ${r.competitor.last_name || ''}`)) || 
+                    ""
+                ).trim().toLowerCase();
 
-                if (rowStr.includes(sukunimi)) {
+                if (ampujaNimiKiti === etsittavaKokoNimi || JSON.stringify(r).toLowerCase().includes(etsittavaKokoNimi)) {
                     let sij = r.place || r.rank || r.position || ((page - 1) * 25 + i + 1);
                     sijoitusCache[key] = `${sij}.`;
                     return `${sij}.`;
