@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v2.0</title>
+    <title>KITI Tulosvertailu v3.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -213,8 +213,8 @@
 </div>
 
 <script>
-// Pakotetaan selaimen muistin tyhjennys uuden version kunniaksi (v2.0)
-const KITI_VERSIO = "2.0_FINAL";
+// Tyhjennetään selaimen vanha muisti v3.0 johdosta
+const KITI_VERSIO = "v3.0_RELEASE";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -274,7 +274,7 @@ async function lisaaJaHaeAmpuja() {
     statusEl.innerText = `Haetaan tuloksia henkilölle ${nimi}...`;
 
     try {
-        const response = await fetch(`/api/kiti?id=${id}&t=${Date.now()}`);
+        const response = await fetch(`/api/kiti?id=${id}&nocache=${Date.now()}`);
         const contentType = response.headers.get("content-type");
 
         if (!contentType || !contentType.includes("application/json")) {
@@ -290,7 +290,7 @@ async function lisaaJaHaeAmpuja() {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
             return {
-                pvm: row.kiti_pvm_tarkka || "2026-01-01",
+                pvm: row.todellinen_pvm || "2026-01-01",
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
@@ -430,7 +430,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO (Uusin kisa ensin)
+    // TAULUKKO (Uusin kisa ylimpänä täsmällisen päivämäärän mukaan)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
