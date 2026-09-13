@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v30.0</title>
+    <title>KITI Tulosvertailu v31.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -219,8 +219,8 @@
                 <label for="uusiId" style="margin-top: 10px;">Sportti-ID</label>
                 <input type="text" id="uusiId" placeholder="Esim. 29364659">
 
-                <label for="uusiSijoitus" style="margin-top: 10px;">Paras sijoitus (valinnainen / korjaus)</label>
-                <input type="text" id="uusiSijoitus" placeholder="Haetaan automaattisesti tai laita käsin">
+                <label for="uusiSijoitus" style="margin-top: 10px;">Sijoitus (valinnainen / jätä tyhjäksi autohaulle)</label>
+                <input type="text" id="uusiSijoitus" placeholder="Haetaan automaattisesti">
 
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
@@ -291,7 +291,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v30.0_AUTO_RANK_FETCH";
+const KITI_VERSIO = "v31.0_DYNAMIC_RANK_FETCH";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -309,19 +309,21 @@ function alusta() {
     paivitaValikot(true);
     paivitaNakyma();
     
-    // Haetaan automaattisesti sijoitukset taustalla, jos niitä ei ole tallennettu
+    // Yritetään hakea puuttuvat sijoitukset automaattisesti sivulatauksella
     ampujat.forEach(a => {
-        if (!a.sijoitus || a.sijoitus === "-") {
-            haeAutomaattinenSijoitus(a.id);
+        if ((!a.sijoitus || a.sijoitus === "-") && a.autoSportId && a.autoCategoryId) {
+            haeAutomaattinenSijoitus(a.id, a.autoSportId, a.autoCategoryId);
         }
     });
 }
 
-async function haeAutomaattinenSijoitus(sporttiId) {
+// Hakee dynaamisesti KITI:n tilastoista sijoituksen käyttäen ampujan omista tuloksista poimittua lajia ja sarjaa
+async function haeAutomaattinenSijoitus(sporttiId, sportId, categoryId) {
     try {
-        // Käydään läpi vaikkapa 3 ensimmäistä sivua tilastoista
-        for (let page = 1; page <= 3; page++) {
-            const url = `/api/resultlist/?category=2&fields!=partial&level=8,10,11&limit=25&page=${page}&sport=1&type=1&nocache=${Date.now()}`;
+        const levels = "8,10,11"; // Oletustasot, kuten annoit URL:ssa
+        // Selaillaan ensimmäiset 4 sivua (max 100 tulosta)
+        for (let page = 1; page <= 4; page++) {
+            const url = `/api/resultlist/?category=${categoryId}&fields!=partial&level=${levels}&limit=25&page=${page}&sport=${sportId}&type=1&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
             const data = await response.json();
@@ -347,7 +349,7 @@ async function haeAutomaattinenSijoitus(sporttiId) {
             }
         }
     } catch (e) {
-        // Hiljainen virheenkäsittely taustahaulle
+        // Hiljainen virheenkäsittely
     }
 }
 
@@ -452,27 +454,43 @@ async function lisaaJaHaeAmpuja() {
             throw new Error("Antamallasi Sportti-ID:llä ei löytynyt tuloksia.");
         }
 
+        let parasRivi = null;
+        let maksimiTulos = -1;
+
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
+            const tulos = parseFloat(String(tRaw).replace(",", "."));
             
+            // Yritetään löytää kisan paras tulos, josta poimitaan laji/sarja-ID:t sijoitushakua varten
+            if (tulos > maksimiTulos) {
+                maksimiTulos = tulos;
+                parasRivi = row;
+            }
+
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
-                tulos: parseFloat(String(tRaw).replace(",", "."))
+                tulos: tulos
             };
         }).filter(r => r.tulos > 0);
 
         if (uudet.length > 0) {
             let olemassa = ampujat.find(a => a.id === id);
             let lopullinenSijoitus = manuaaliSijoitus || (olemassa ? olemassa.sijoitus : "-");
+            
+            // Etsitään Kiti-ID:t automaattista sijoitushakua varten
+            let autoSportId = parasRivi ? (parasRivi.sport_id || parasRivi.sportId || (parasRivi.sport && parasRivi.sport.id) || "1") : "1";
+            let autoCategoryId = parasRivi ? (parasRivi.category_id || parasRivi.categoryId || (parasRivi.category && parasRivi.category.id) || "2") : "2";
 
             if (!olemassa) {
-                ampujat.push({ nimi, id, sijoitus: lopullinenSijoitus, aktiivinen: true });
+                ampujat.push({ nimi, id, sijoitus: lopullinenSijoitus, aktiivinen: true, autoSportId, autoCategoryId });
             } else {
                 olemassa.nimi = nimi;
+                olemassa.autoSportId = autoSportId;
+                olemassa.autoCategoryId = autoCategoryId;
                 if (manuaaliSijoitus) olemassa.sijoitus = manuaaliSijoitus;
             }
             localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
@@ -489,9 +507,12 @@ async function lisaaJaHaeAmpuja() {
             paivitaValikot(true);
             paivitaNakyma();
 
-            // Jos sijoitusta ei annettu käsin, yritetään hakea se automaattisesti tilasto-rajapinnasta
+            // Laitetaan sijoitushaku käyntiin taustalla, jos sijoitusta ei annettu käsin
             if (!lopullinenSijoitus || lopullinenSijoitus === "-") {
-                haeAutomaattinenSijoitus(id);
+                statusEl.innerText = `Löytyi ${uudet.length} tulosta! Etsitään sijoitusta...`;
+                haeAutomaattinenSijoitus(id, autoSportId, autoCategoryId).then(() => {
+                    statusEl.innerText = `Löytyi ${uudet.length} tulosta! Valmis.`;
+                });
             }
         } else {
             statusEl.innerText = "Ei kelvollisia tuloksia.";
