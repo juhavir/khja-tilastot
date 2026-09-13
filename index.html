@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v9.0</title>
+    <title>KITI Tulosvertailu v10.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -99,6 +99,9 @@
 
         .btn-danger { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); margin: 0; padding: 2px 6px; font-size: 0.7rem; width: auto; }
         .btn-danger:hover { background-color: var(--danger); color: white; }
+
+        .pvm-edit-btn { background: transparent; border: 1px solid var(--card-border); color: var(--text-muted); padding: 1px 4px; font-size: 0.65rem; margin-left: 4px; cursor: pointer; }
+        .pvm-edit-btn:hover { border-color: var(--primary); color: var(--primary); }
 
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
 
@@ -240,7 +243,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v9.0_TIMELINE_FIX";
+const KITI_VERSIO = "v10.0_DYNAMIC_DATES";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -248,12 +251,12 @@ if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
 
 let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
+let mukautetutPvm = JSON.parse(localStorage.getItem("kiti_pvm_overrides")) || {};
 let myChart = null;
 
 const variPaletti = ['#38bdf8', '#f87171', '#34d399', '#fbbf24', '#c084fc'];
 
 function alusta() {
-    // Varmistetaan aktiivisuus-lippu jokaiselle ampujalle
     ampujat.forEach(a => { if (a.aktiivinen === undefined) a.aktiivinen = true; });
     paivitaAmpujatLista();
     paivitaValikot(true);
@@ -292,32 +295,57 @@ function tunnistaSarja(row) {
     return "Muu";
 }
 
+// ÄLYKÄS PVM-TUNNISTUS
 function tunnistaKisanPaivamaara(row) {
-    const nimi = etsiKilpailunNimi(row).toLowerCase();
-
-    if (nimi.includes("pohjanmaan am") && nimi.includes("pienoiskivääri")) return "2026-08-15";
-    if (nimi.includes("kyröön malja 2026")) return "2026-07-18";
-    if (nimi.includes("sm26") || nimi.includes("ilma-aseiden sm")) return "2026-04-10";
-    if (nimi.includes("kultahippujen ilma-asefinaalit")) return "2026-03-28";
-    if (nimi.includes("vanhan paukun kevätkisat")) return "2026-03-07";
-    if (nimi.includes("pohjanmaa kultahippu aluemestaruus")) return "2026-03-07";
-    if (nimi.includes("pohjanmaan am-kilpailut") && nimi.includes("ilmakivääri")) return "2026-02-14";
-    if (nimi.includes("helmikuun kisa")) return "2026-02-06";
-    if (nimi.includes("välipäiväkilpailu")) return "2025-12-27";
-    if (nimi.includes("vanhan paukun syyskisat")) return "2025-11-08";
-    if (nimi.includes("pyhäinpäiväkilpailut")) return "2025-10-31";
-
-    if (row.competition_start_date) return String(row.competition_start_date).substring(0, 10);
-    if (row.start_date) return String(row.start_date).substring(0, 10);
-    if (row.competition && typeof row.competition === 'object') {
-        const c = row.competition;
-        if (c.start_date) return String(c.start_date).substring(0, 10);
-        if (c.competition_start_date) return String(c.competition_start_date).substring(0, 10);
-        if (c.date) return String(c.date).substring(0, 10);
+    const kisanNimi = etsiKilpailunNimi(row);
+    if (mukautetutPvm[kisanNimi]) {
+        return mukautetutPvm[kisanNimi];
     }
-    if (row.date) return String(row.date).substring(0, 10);
 
-    return "2026-01-01";
+    const txt = JSON.stringify(row);
+    
+    // 1. Haetaan ISO-muotoinen päivämäärä (YYYY-MM-DD) mistä tahansa datasta
+    const isoMatch = txt.match(/\b(202[4-6]-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01]))\b/);
+    if (isoMatch) return isoMatch[1];
+
+    // 2. Haetaan nimen perusteella vuosiluku
+    let vuosi = "2026";
+    if (kisanNimi.includes("2025") || kisanNimi.toLowerCase().includes("syyskisa") || kisanNimi.toLowerCase().includes("kinkkukisa") || kisanNimi.toLowerCase().includes("loppiaiskisa 2025") || kisanNimi.toLowerCase().includes("pyhäinpäivä")) {
+        vuosi = "2025";
+    }
+
+    // 3. Haetaan kuukausi nimen perusteella
+    const n = kisanNimi.toLowerCase();
+    if (n.includes("loppiais")) return `${vuosi}-01-06`;
+    if (n.includes("helmikuu")) return `${vuosi}-02-10`;
+    if (n.includes("kevätkisa")) return `${vuosi}-03-15`;
+    if (n.includes("aprilli")) return `${vuosi}-04-01`;
+    if (n.includes("kultahippufinaali") || n.includes("sm26") || n.includes("sm-kilpailu")) return `${vuosi}-04-12`;
+    if (n.includes("lokakisa")) return `${vuosi}-10-15`;
+    if (n.includes("pyhäinpäivä")) return `${vuosi}-11-01`;
+    if (n.includes("syyskisa")) return `${vuosi}-11-10`;
+    if (n.includes("kinkkukisa") || n.includes("välipäivä")) return `${vuosi}-12-28`;
+
+    return `${vuosi}-01-01`;
+}
+
+function muokkaaPaivamaaraa(kisanNimi, nykyinenPvm) {
+    const uusiPvm = prompt(`Aseta uusi päivämäärä kilpailulle "${kisanNimi}" (Muodossa YYYY-MM-DD):`, nykyinenPvm);
+    if (uusiPvm && /^\d{4}-\d{2}-\d{2}$/.test(uusiPvm)) {
+        mukautetutPvm[kisanNimi] = uusiPvm;
+        localStorage.setItem("kiti_pvm_overrides", JSON.stringify(mukautetutPvm));
+        
+        // Päivitetään pvm myös olemassa olevaan dataan
+        tulosData.forEach(d => {
+            if (d.kilpailu === kisanNimi) {
+                d.pvm = uusiPvm;
+            }
+        });
+        localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
+        paivitaNakyma();
+    } else if (uusiPvm) {
+        alert("Päivämäärän pitää olla muodossa YYYY-MM-DD (esim. 2026-03-15)");
+    }
 }
 
 async function lisaaJaHaeAmpuja() {
@@ -515,7 +543,10 @@ function paivitaNakyma() {
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
-            <td><b>${d.pvm}</b></td>
+            <td>
+                <b>${d.pvm}</b>
+                <button class="pvm-edit-btn" onclick="muokkaaPaivamaaraa('${d.kilpailu.replace(/'/g, "\\'")}', '${d.pvm}')">✏️</button>
+            </td>
             <td style="color: var(--text-muted);">${d.kilpailu}</td>
             <td><b>${d.ampuja}</b></td>
             <td><span class="tag tag-laji">${d.laji}</span></td>
@@ -533,11 +564,8 @@ function piirraKaavio(data) {
     if (myChart) { myChart.destroy(); }
 
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
-
-    // Muodostetaan yhtenäiset kilpailu-labelit aikajärjestyksessä (vanhin -> uusin)
     const jarjestettyKokoData = jarjestaPvmMukaan(data, false);
     
-    // Luodaan uniikit akseli-labelit muodossa "YYYY-MM-DD (Kilpailun nimi)"
     const labelSet = new Set();
     jarjestettyKokoData.forEach(d => {
         labelSet.add(`${d.pvm} (${d.kilpailu})`);
@@ -548,7 +576,6 @@ function piirraKaavio(data) {
         const ampujaRivit = data.filter(d => d.ampuja === amp);
         const vari = variPaletti[idx % variPaletti.length];
         
-        // Kohdistetaan jokaisen ampujan tulos täsmälleen oikeaan yhtenäiseen label-indeksiin
         const pointData = labels.map(lbl => {
             const hit = ampujaRivit.find(d => `${d.pvm} (${d.kilpailu})` === lbl);
             return hit ? hit.tulos : null;
@@ -561,7 +588,7 @@ function piirraKaavio(data) {
             backgroundColor: vari,
             borderWidth: 2,
             tension: 0.15,
-            spanGaps: true, // Yhdistetään viivat vaikka joku kisa välistä puuttuisi
+            spanGaps: true,
             pointRadius: 5,
             pointHoverRadius: 7
         };
