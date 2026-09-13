@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v79.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v80.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v79.0_STRICT_PISTOL_FIX";
+const KITI_VERSIO = "v80.0_EXACT_MAPPING";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -386,6 +386,35 @@ let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
 const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
+
+// Virallinen koodistomuunnos KITI:n ID:ille, numeroille ja tunnisteille (ei arvailua)
+const KITI_LAJI_MAP = {
+    // Esimerkkejä virallisista ID-koodidta / numeroista (laajenna tarvittaessa)
+    "1": "Ilmakivääri",
+    "2": "Ilmapistooli",
+    "3": "Pienoiskivääri Makuu",
+    "4": "Pienoiskivääri Asento (3x20/3x40)",
+    "5": "Vapaapistooli",
+    "6": "Pienoispistooli",
+    "7": "Isopistooli",
+    "8": "Vakiopistooli",
+    "9": "Olympiapistooli",
+    "10": "Skeet",
+    "11": "Trap"
+};
+
+const KITI_SARJA_MAP = {
+    "Y": "Yleinen",
+    "M": "Miehet",
+    "N": "Naiset",
+    "Y16": "Y16",
+    "Y18": "Y18",
+    "Y20": "Y20",
+    "Y50": "Y50",
+    "Y60": "Y60",
+    "Y70": "Y70",
+    "N50": "N50"
+};
 
 function alusta() {
     const tallennettuTeema = localStorage.getItem("kiti_teema") || "dark";
@@ -428,69 +457,32 @@ function etsiKilpailunNimi(row) {
     return "Kilpailu";
 }
 
-function tunnistaLajiTarkasti(row) {
-    // 1. Luetaan tarkasti KITI:n omat viralliset lajikentät ilman harhaanjohtavia yleistyksiä
+function ratkaiseLajiTarkasti(row) {
+    // 1. Tarkistetaan numerokoodi tai ID suoraan virallisesta taulukosta
+    const sportId = String(row.sport_id || row.sportId || row.discipline_id || row.disciplineId || row.event_id || row.eventId || "");
+    if (sportId && KITI_LAJI_MAP[sportId]) {
+        return KITI_LAJI_MAP[sportId];
+    }
+
+    // 2. Luetaan suoraan KITI:n palauttama selkokielinen kenttä
     const apiLaji = row.event_name || row.eventName || row.sport_name || row.sportName || row.sport || row.discipline || row.discipline_name;
-    if (apiLaji && typeof apiLaji === 'string' && apiLaji.length > 1) {
-        const al = apiLaji.toLowerCase();
-        
-        // Haulikko
-        if (al.includes("skeet")) return "Skeet";
-        if (al.includes("trap")) return "Trap";
-        if (al.includes("compak") || al.includes("sporting")) return "Compak Sporting";
-
-        // Ilmakivääri / Kivääri
-        if (al.includes("ilmakivääri") || al.includes("ikv")) return "Ilmakivääri";
-        if (al.includes("pienoiskivääri") || al.includes("50m kivääri")) {
-            if (al.includes("asento") || al.includes("3x") || al.includes("3 x") || al.includes("40")) return "Pienoiskivääri Asento (3x20/3x40)";
-            return "Pienoiskivääri Makuu";
-        }
-
-        // Pistoolilajit tarkasti yksilöityinä
-        if (al.includes("ilmapistooli") || al.includes("ipis")) return "Ilmapistooli";
-        if (al.includes("vapaapistooli")) return "Vapaapistooli";
-        if (al.includes("pienoispistooli")) return "Pienoispistooli";
-        if (al.includes("isopistooli")) return "Isopistooli";
-        if (al.includes("olympiapistooli")) return "Olympiapistooli";
-        if (al.includes("vakiopistooli")) return "Vakiopistooli";
-        if (al.includes("pikapistooli")) return "Pikapistooli";
-
-        // Jos API tarjoaa jonkin muun tarkan nimen, käytetään sitä sellaisenaan
-        return apiLaji;
+    if (apiLaji && typeof apiLaji === 'string' && apiLaji.trim().length > 1) {
+        return apiLaji.trim();
     }
 
-    // 2. Vain jos API-lajitietoa ei ole lainkaan, tarkistetaan rivin sisältö tiukasti
-    const txt = JSON.stringify(row).toLowerCase();
-    const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
-
-    if (txt.includes("skeet") || kisaNimi.includes("skeet")) return "Skeet";
-    if (txt.includes("trap") || kisaNimi.includes("trap")) return "Trap";
-
-    if (txt.includes("ilmakivääri") || txt.includes("ikv")) return "Ilmakivääri";
-    if (txt.includes("ilmapistooli") || txt.includes("ipis")) return "Ilmapistooli";
-
-    if (txt.includes("pienoiskivääri") || txt.includes("50m")) {
-        const onAsento = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x");
-        return onAsento ? "Pienoiskivääri Asento (3x20/3x40)" : "Pienoiskivääri Makuu";
-    }
-
-    if (txt.includes("vapaapistooli")) return "Vapaapistooli";
-    if (txt.includes("pienoispistooli")) return "Pienoispistooli";
-    if (txt.includes("isopistooli")) return "Isopistooli";
-    if (txt.includes("olympiapistooli")) return "Olympiapistooli";
-    if (txt.includes("vakiopistooli")) return "Vakiopistooli";
-
-    return "Muu laji";
+    return "Tuntematon laji";
 }
 
-function tunnistaSarja(row) {
-    if (row.category && typeof row.category === 'string') return row.category;
-    if (row.category && typeof row.category === 'object') return row.category.code || row.category.name || "Muu";
-    if (row.category) return String(row.category);
-    if (row.series) return String(row.series);
-    if (row.class_name) return String(row.class_name);
-    if (row.className) return String(row.className);
-    if (row.category_code) return String(row.category_code);
+function ratkaiseSarjaTarkasti(row) {
+    const rawCat = row.category || row.series || row.class_name || row.className || row.category_code;
+    if (rawCat) {
+        if (typeof rawCat === 'object') {
+            const code = rawCat.code || rawCat.name || "";
+            return KITI_SARJA_MAP[code] || code || "Muu";
+        }
+        const strCat = String(rawCat).trim();
+        return KITI_SARJA_MAP[strCat] || strCat;
+    }
     return "Muu";
 }
 
@@ -556,8 +548,8 @@ async function lisaaJaHaeAmpuja() {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
-                laji: tunnistaLajiTarkasti(row),
-                sarja: tunnistaSarja(row),
+                laji: ratkaiseLajiTarkasti(row),
+                sarja: ratkaiseSarjaTarkasti(row),
                 tulos: tulos,
                 sija: !isNaN(sija) ? sija : null
             };
