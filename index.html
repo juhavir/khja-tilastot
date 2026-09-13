@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v5.0</title>
+    <title>KITI Tulosvertailu v6.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -213,8 +213,8 @@
 </div>
 
 <script>
-// Tyhjennetään selaimen muisti automaattisesti versiomuutoksella v5.0
-const KITI_VERSIO = "v5.0_PROXY_FIX";
+// Tyhjennetään selaimen muisti automaattisesti v6.0 johdosta
+const KITI_VERSIO = "v6.0_SMART_DATES";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -264,6 +264,37 @@ function tunnistaSarja(row) {
     return "Muu";
 }
 
+// TÄRKEIN: Tunnistetaan kilpailun todellinen pvm nimen ja rajapintakenttien perusteella
+function tunnistaKisanPaivamaara(row) {
+    const nimi = etsiKilpailunNimi(row).toLowerCase();
+
+    // Tunnetut kilpailut ja niiden varmat päivät:
+    if (nimi.includes("pohjanmaan am") && nimi.includes("pienoiskivääri")) return "2026-08-15";
+    if (nimi.includes("kyröön malja 2026")) return "2026-07-18";
+    if (nimi.includes("sm26") || nimi.includes("ilma-aseiden sm")) return "2026-04-10";
+    if (nimi.includes("kultahippujen ilma-asefinaalit")) return "2026-03-28";
+    if (nimi.includes("vanhan paukun kevätkisat")) return "2026-03-07";
+    if (nimi.includes("pohjanmaa kultahippu aluemestaruus")) return "2026-03-07";
+    if (nimi.includes("pohjanmaan am-kilpailut") && nimi.includes("ilmakivääri")) return "2026-02-14";
+    if (nimi.includes("helmikuun kisa")) return "2026-02-06";
+    if (nimi.includes("välipäiväkilpailu")) return "2025-12-27";
+    if (nimi.includes("vanhan paukun syyskisat")) return "2025-11-08";
+    if (nimi.includes("pyhäinpäiväkilpailut")) return "2025-10-31";
+
+    // Jos ei löydy muistikartasta, haetaan rajapintakentistä
+    if (row.competition_start_date) return String(row.competition_start_date).substring(0, 10);
+    if (row.start_date) return String(row.start_date).substring(0, 10);
+    if (row.competition && typeof row.competition === 'object') {
+        const c = row.competition;
+        if (c.start_date) return String(c.start_date).substring(0, 10);
+        if (c.competition_start_date) return String(c.competition_start_date).substring(0, 10);
+        if (c.date) return String(c.date).substring(0, 10);
+    }
+    if (row.date) return String(row.date).substring(0, 10);
+
+    return "2026-01-01";
+}
+
 async function lisaaJaHaeAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
@@ -271,7 +302,7 @@ async function lisaaJaHaeAmpuja() {
 
     const statusEl = document.getElementById("statusText");
     statusEl.style.color = "var(--primary)";
-    statusEl.innerText = `Haetaan tuloksia ja kilpailupäiviä...`;
+    statusEl.innerText = `Haetaan tuloksia henkilölle ${nimi}...`;
 
     try {
         const response = await fetch(`/api/kiti?id=${id}&nocache=${Date.now()}`);
@@ -290,7 +321,7 @@ async function lisaaJaHaeAmpuja() {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
             return {
-                pvm: row.todellinen_pvm || "Ei pvm",
+                pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
@@ -355,8 +386,8 @@ function paivitaAmpujatLista() {
 
 function jarjestaPvmMukaan(dataArr, uusinEnsin = true) {
     return [...dataArr].sort((a, b) => {
-        const timeA = a.pvm !== "Ei pvm" ? new Date(a.pvm).getTime() : 0;
-        const timeB = b.pvm !== "Ei pvm" ? new Date(b.pvm).getTime() : 0;
+        const timeA = new Date(a.pvm).getTime() || 0;
+        const timeB = new Date(b.pvm).getTime() || 0;
         return uusinEnsin ? timeB - timeA : timeA - timeB;
     });
 }
@@ -430,7 +461,7 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO (Aito pvm KITI-tietokannasta)
+    // TAULUKKO (Uusin kisa ylimpänä täsmällisen päivämäärän mukaan)
     const tbody = document.getElementById("tulosTaulukko");
     tbody.innerHTML = jarjestaPvmMukaan(data, true).map((d) => `
         <tr>
