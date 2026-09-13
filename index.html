@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v40.0</title>
+    <title>KITI Tulosvertailu v41.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v40.0_UNIQUE_SHOOTERS_RANK";
+const KITI_VERSIO = "v41.0_ROBUST_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -307,15 +307,19 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan sijoitus ryhmittelemällä suoritukset urheilijakohtaisesti (jokainen ampuja lasketaan vain kerran)
+// Haetaan sijoitus ryhmittelemällä urheilijat uniikisti ja purkamalla nimitiedot tarkasti
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     if (!sportId || !categoryId) return "-";
 
     try {
         const etsittavaKokoNimi = ampujaNimi.trim().toLowerCase();
-        const nahdytUrheilijat = new Set(); // Uniikit ampujat
+        const osat = etsittavaKokoNimi.split(" ");
+        const etunimi = osat[0];
+        const sukunimi = osat[osat.length - 1];
 
-        for (let page = 1; page <= 8; page++) {
+        const nahdytUrheilijat = new Set();
+
+        for (let page = 1; page <= 10; page++) {
             const url = `/api/statistics?sport=${sportId}&category=${categoryId}&page=${page}&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
@@ -326,23 +330,31 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
 
             for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
+                const rTxt = JSON.stringify(r).toLowerCase();
                 
-                const ampujaNimiKiti = (
-                    r.shooter_name || 
-                    r.competitor_name || 
-                    r.name || 
-                    (r.shooter && (r.shooter.name || `${r.shooter.first_name || ''} ${r.shooter.last_name || ''}`)) || 
-                    (r.competitor && (r.competitor.name || `${r.competitor.first_name || ''} ${r.competitor.last_name || ''}`)) || 
-                    ""
-                ).trim().toLowerCase();
+                // Selvitetään nimi oliorakenteesta
+                let ampujaNimiKiti = "";
+                if (r.competitor && typeof r.competitor === 'object') {
+                    ampujaNimiKiti = `${r.competitor.first_name || ''} ${r.competitor.last_name || ''}`.trim();
+                } else if (r.shooter && typeof r.shooter === 'object') {
+                    ampujaNimiKiti = `${r.shooter.first_name || ''} ${r.shooter.last_name || ''}`.trim();
+                } else {
+                    ampujaNimiKiti = String(r.shooter_name || r.competitor_name || r.name || "").trim();
+                }
+                
+                ampujaNimiKiti = ampujaNimiKiti.toLowerCase();
 
-                if (ampujaNimiKiti) {
-                    nahdytUrheilijat.add(ampujaNimiKiti);
+                // Jos nimi löytyy joko oliosta tai JSON-merkkijonosta
+                const onSamaNimi = (ampujaNimiKiti === etsittavaKokoNimi) || 
+                                   (ampujaNimiKiti.includes(etunimi) && ampujaNimiKiti.includes(sukunimi)) ||
+                                   (rTxt.includes(etunimi) && rTxt.includes(sukunimi));
 
-                    if (ampujaNimiKiti === etsittavaKokoNimi || JSON.stringify(r).toLowerCase().includes(etsittavaKokoNimi)) {
-                        const oikeaSijoitus = nahdytUrheilijat.size;
-                        return `${oikeaSijoitus}.`;
-                    }
+                // Lisätään tunniste (käytetään nimeä avaimena)
+                const tunnus = ampujaNimiKiti || `tunnus_${i}_${page}`;
+                nahdytUrheilijat.add(tunnus);
+
+                if (onSamaNimi) {
+                    return `${nahdytUrheilijat.size}.`;
                 }
             }
         }
