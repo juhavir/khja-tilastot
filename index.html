@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v60.0</title>
+    <title>KITI Tulosvertailu v61.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -291,7 +291,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v60.0_PODIUM_STATS";
+const KITI_VERSIO = "v61.0_SMART_CHART";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -415,7 +415,6 @@ async function lisaaJaHaeAmpuja() {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", "."));
 
-            // Tarkistetaan tuleeko kitistä suora sijoitustieto riveiltä
             let sija = null;
             if (row.rank !== undefined) sija = parseInt(row.rank, 10);
             else if (row.position !== undefined) sija = parseInt(row.position, 10);
@@ -612,9 +611,7 @@ function paivitaNakyma() {
             const kisakunto = laskeKisakunto(aTuloksetRajatut);
             const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
-            const kaV10 = laskeKA(aTuloksetRajatut.slice(0, 10));
 
-            // Lasketaan mitalit valitun datan (rajauksen) perusteella
             let kultaa = 0;
             let hopeaa = 0;
             let pronssia = 0;
@@ -627,7 +624,6 @@ function paivitaNakyma() {
             const lbl1 = maaraValinta === "kaikki" ? "Valitut (Kaikki)" : `Valitut (${aRivitRajattu.length} kpl)`;
             const lbl2 = "Viimeiset 3";
             const lbl3 = "Viimeiset 5";
-            const lbl4 = "Viimeiset 10";
 
             const pb = aRivitKaikki.length > 0 ? Math.max(...aRivitKaikki.map(d => d.tulos)) : "-";
             const valitunAjanParas = aTuloksetRajatut.length > 0 ? Math.max(...aTuloksetRajatut) : pb;
@@ -646,19 +642,19 @@ function paivitaNakyma() {
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa näytössä)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat" title="Voitetut 1. sijat (Kulta)"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
-                        <div class="sub-stat" title="Voitetut 2. sijat (Hopea)"><span class="val" style="color:var(--silver);">🥈 ${hopeaa}</span><span class="lbl">2. sijat</span></div>
-                        <div class="sub-stat" title="Voitetut 3. sijat (Pronssi)"><span class="val" style="color:var(--bronze);">🥉 ${pronssia}</span><span class="lbl">3. sijat</span></div>
-                        <div class="sub-stat" title="Keskiarvo kaikista tällä hetkellä näytöllä olevista valituista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
-                        <div class="sub-stat" title="Tämänhetkinen kisakunto: Viimeisen 5 kilpailun keskiarvo, josta paras ja heikoin tulos on poistettu"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
+                        <div class="sub-stat" title="Voitetut 1. sijat"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
+                        <div class="sub-stat" title="Voitetut 2. sijat"><span class="val" style="color:var(--silver);">🥈 ${hopeaa}</span><span class="lbl">2. sijat</span></div>
+                        <div class="sub-stat" title="Voitetut 3. sijat"><span class="val" style="color:var(--bronze);">🥉 ${pronssia}</span><span class="lbl">3. sijat</span></div>
+                        <div class="sub-stat" title="Keskiarvo näytöllä olevista kilpailuista"><span class="val">${kaValitut}</span><span class="lbl">${lbl1}</span></div>
+                        <div class="sub-stat" title="Kisakunto: Viimeisen 5 kilpailun keskiarvo (paras ja heikoin poistettu)"><span class="val" style="color:var(--primary);">${kisakunto}</span><span class="lbl">Kisakunto</span></div>
                         <div class="sub-stat" title="Viimeisen 3 kilpailun keskiarvo"><span class="val">${kaV3}</span><span class="lbl">${lbl2}</span></div>
                         <div class="sub-stat" title="Viimeisen 5 kilpailun keskiarvo"><span class="val">${kaV5}</span><span class="lbl">${lbl3}</span></div>
                     </div>
                     <div class="extra-stats">
-                        <div title="Koko historian / valinnan korkein tulos">Ennätys (PB)<b>${pb}</b></div>
-                        <div title="Valitun ajanjakson / rajauksen paras tulos">Valitun paras<b>${valitunAjanParas}</b></div>
-                        <div title="Valitun ajanjakson / rajauksen matalin tulos">Valitun heikoin<b>${valitunAjanHeikoin}</b></div>
-                        <div title="Tulosten keskihajonta (±) sekä viimeisimmän kisan muutos edelliseen (+/-)">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
+                        <div title="Koko historian korkein tulos">Ennätys (PB)<b>${pb}</b></div>
+                        <div title="Valitun ajanjakson paras tulos">Valitun paras<b>${valitunAjanParas}</b></div>
+                        <div title="Valitun ajanjakson matalin tulos">Valitun heikoin<b>${valitunAjanHeikoin}</b></div>
+                        <div title="Tulosten keskihajonta sekä viimeisimmän kisan muutos">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
                 </div>
             `;
@@ -690,10 +686,10 @@ function paivitaNakyma() {
         </tr>
     `).join("");
 
-    piirraKaavio(taulukkoData);
+    piirraKaavio(taulukkoData, valittuLaji, valittuSarja);
 }
 
-function piirraKaavio(data) {
+function piirraKaavio(data, valittuLaji, valittuSarja) {
     const ctx = document.getElementById('tulosKaavio').getContext('2d');
     
     if (myChart) { myChart.destroy(); }
@@ -707,17 +703,28 @@ function piirraKaavio(data) {
     });
     const labels = Array.from(labelSet);
 
+    // Tarkistetaan onko valittu "Kaikki" lajeissa tai sarjoissa
+    const naytetaankoSijoituksia = (valittuLaji === "Kaikki" || valittuSarja === "Kaikki");
+
     const datasets = aktiivisetAmpujatNimet.map((amp, idx) => {
         const ampujaRivit = data.filter(d => d.ampuja === amp);
         const vari = variPaletti[idx % variPaletti.length];
         
         const pointData = labels.map(lbl => {
             const hit = ampujaRivit.find(d => `${d.pvm} (${d.kilpailu})` === lbl);
-            return hit ? hit.tulos : null;
+            if (!hit) return null;
+
+            if (naytetaankoSijoituksia) {
+                // Jos näyttää sijoituksia, käytetään sijoitusta (jos ei sijoitusta, palautetaan null)
+                // Invertataan sijoitus, jotta 1. sija on graafin huipulla (esim. max sija - sija tai skaalaus)
+                return hit.sija ? hit.sija : null;
+            } else {
+                return hit.tulos;
+            }
         });
 
         return {
-            label: amp,
+            label: naytetaankoSijoituksia ? `${amp} (Sijoitukset)` : amp,
             data: pointData,
             borderColor: vari,
             backgroundColor: vari,
@@ -747,6 +754,9 @@ function piirraKaavio(data) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
+                            if (naytetaankoSijoituksia) {
+                                return `${context.dataset.label}: Sija ${context.raw}`;
+                            }
                             return `${context.dataset.label}: ${context.raw} pnt`;
                         }
                     }
@@ -763,7 +773,18 @@ function piirraKaavio(data) {
                     grid: { color: '#1a2234' }
                 },
                 y: {
-                    ticks: { color: '#9ca3af', font: { size: 10 } },
+                    // Jos näytetään sijoituksia, käännetään Y-akseli ylösalaisin niin että 1. on ylhäällä
+                    reverse: naytetaankoSijoituksia,
+                    ticks: { 
+                        color: '#9ca3af', 
+                        font: { size: 10 },
+                        callback: function(value) {
+                            if (naytetaankoSijoituksia) {
+                                return `${value}. sija`;
+                            }
+                            return value;
+                        }
+                    },
                     grid: { color: '#1a2234' }
                 }
             }
