@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v18.0</title>
+    <title>KITI Tulosvertailu v19.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -128,7 +128,7 @@
         }
         .btn-danger:hover { background-color: var(--danger); color: white; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 20px; }
 
         .stat-box { 
             background: var(--input-bg); 
@@ -140,11 +140,12 @@
         .stat-header { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
         .sub-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 8px; }
-        .sub-stat { display: flex; flex-direction: column; }
+        .sub-stat { display: flex; flex-direction: column; cursor: help; }
         .sub-stat .val { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
         .sub-stat .lbl { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
 
         .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats > div { cursor: help; }
         .extra-stats b { color: var(--text-main); display: block; font-size: 0.8rem; }
 
         .chart-container { position: relative; width: 100%; height: 320px; }
@@ -257,7 +258,7 @@
             </div>
 
             <div class="card">
-                <h2>Keskiarvot & Tilastot</h2>
+                <h2>Keskiarvot</h2>
                 <div id="ampujatStats" class="stats-grid"></div>
                 <div class="chart-container">
                     <canvas id="tulosKaavio"></canvas>
@@ -287,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v18.0_FILTER_COUNT";
+const KITI_VERSIO = "v19.0_TOOLTIPS";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -553,7 +554,6 @@ function paivitaNakyma() {
         infoEl.style.display = "none";
     }
 
-    // Perussuodatus lajille ja sarjalle
     let data = tulosData.filter(d => 
         aktiivisetAmpujatNimet.includes(d.ampuja) &&
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
@@ -564,10 +564,8 @@ function paivitaNakyma() {
 
     if (aktiivisetAmpujatNimet.length > 0) {
         statsContainer.innerHTML = aktiivisetAmpujatNimet.map((amp, idx) => {
-            // Haetaan ampujan omat tulokset aikajärjestyksessä (uusin ensin)
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
             
-            // Rajataan kilpailujen määrän mukaan (3, 5, 10 tai kaikki)
             let aRivitRajattu = aRivitKaikki;
             if (maaraValinta !== "kaikki") {
                 const rajoitus = parseInt(maaraValinta, 10);
@@ -583,10 +581,10 @@ function paivitaNakyma() {
 
             const pb = aRivitKaikki.length > 0 ? Math.max(...aRivitKaikki.map(d => d.tulos)) : "-";
             
-            const nykyVuosi = new Date().getFullYear().toString();
-            const kaudenTulokset = aRivitKaikki.filter(d => d.pvm.startsWith(nykyVuosi)).map(d => d.tulos);
-            const sb = kaudenTulokset.length > 0 ? Math.max(...kaudenTulokset) : pb;
-            const ws = kaudenTulokset.length > 0 ? Math.min(...kaudenTulokset) : (aRivitKaikki.length > 0 ? Math.min(...aRivitKaikki.map(d => d.tulos)) : "-");
+            // Valitun ajan parhaat ja heikoimmat (perustuu suodatettuun/valittuun listaan)
+            const valitunAjanTulokset = aRivitRajattu.map(d => d.tulos);
+            const valitunAjanParas = valitunAjanTulokset.length > 0 ? Math.max(...valitunAjanTulokset) : pb;
+            const valitunAjanHeikoin = valitunAjanTulokset.length > 0 ? Math.min(...valitunAjanTulokset) : "-";
 
             let trendiTxt = "-";
             if (aRivitRajattu.length >= 2) {
@@ -601,16 +599,16 @@ function paivitaNakyma() {
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
                     <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
                     <div class="sub-stats-grid">
-                        <div class="sub-stat"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
-                        <div class="sub-stat"><span class="val">${kaV5}</span><span class="lbl">V5</span></div>
-                        <div class="sub-stat"><span class="val">${kaV10}</span><span class="lbl">V10</span></div>
-                        <div class="sub-stat"><span class="val">${kaV15}</span><span class="lbl">V15</span></div>
+                        <div class="sub-stat" title="Kaikkien valittujen kilpailujen keskiarvo"><span class="val">${kaKaikki}</span><span class="lbl">KAIKKI</span></div>
+                        <div class="sub-stat" title="Viimeisen 5 kilpailun keskiarvo"><span class="val">${kaV5}</span><span class="lbl">Viimeiset 5</span></div>
+                        <div class="sub-stat" title="Viimeisen 10 kilpailun keskiarvo"><span class="val">${kaV10}</span><span class="lbl">Viimeiset 10</span></div>
+                        <div class="sub-stat" title="Viimeisen 15 kilpailun keskiarvo"><span class="val">${kaV15}</span><span class="lbl">Viimeiset 15</span></div>
                     </div>
                     <div class="extra-stats">
-                        <div>Ennätys (PB)<b>${pb}</b></div>
-                        <div>Kauden paras<b>${sb}</b></div>
-                        <div>Kauden heikoin<b>${ws}</b></div>
-                        <div>Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
+                        <div title="Koko historian / valinnan korkein tulos">Ennätys (PB)<b>${pb}</b></div>
+                        <div title="Valitun ajanjakson / rajauksen paras tulos">Valitun paras<b>${valitunAjanParas}</b></div>
+                        <div title="Valitun ajanjakson / rajauksen matalin tulos">Valitun heikoin<b>${valitunAjanHeikoin}</b></div>
+                        <div title="Tulosten keskihajonta (±) sekä viimeisimmän kisan muutos edelliseen (+/-)">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
                     </div>
                 </div>
             `;
@@ -619,11 +617,9 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:8px;">Ei aktiivisia ampujia valittuna.</div>';
     }
 
-    // Taulukkoon näytetään rajatut tai kaikki tiedot valinnan mukaan
     let taulukkoData = data;
     if (maaraValinta !== "kaikki") {
         const rajoitus = parseInt(maaraValinta, 10);
-        // Otetaan jokaiselta aktiiviselta ampujalta vain N viimeisintä
         let ryhmitetty = [];
         aktiivisetAmpujatNimet.forEach(amp => {
             const ampujaRivit = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true).slice(0, rajoitus);
