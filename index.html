@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v78.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v79.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v78.0_ACCURATE_PRONE";
+const KITI_VERSIO = "v79.0_STRICT_PISTOL_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -385,7 +385,7 @@ let ampujat = JSON.parse(localStorage.getItem("kiti_ampujat")) || [];
 let tulosData = JSON.parse(localStorage.getItem("kiti_tulokset")) || [];
 let myChart = null;
 
-const variPaletti = ['#0284c7', '#e11d48', '#059669', `-#d97706`, '#9333ea'];
+const variPaletti = ['#0284c7', '#e11d48', '#059669', '#d97706', '#9333ea'];
 
 function alusta() {
     const tallennettuTeema = localStorage.getItem("kiti_teema") || "dark";
@@ -429,40 +429,48 @@ function etsiKilpailunNimi(row) {
 }
 
 function tunnistaLajiTarkasti(row) {
-    // 1. Tarkistetaan ensin KITI-datan omat viralliset lajikentät
+    // 1. Luetaan tarkasti KITI:n omat viralliset lajikentät ilman harhaanjohtavia yleistyksiä
     const apiLaji = row.event_name || row.eventName || row.sport_name || row.sportName || row.sport || row.discipline || row.discipline_name;
     if (apiLaji && typeof apiLaji === 'string' && apiLaji.length > 1) {
         const al = apiLaji.toLowerCase();
+        
+        // Haulikko
         if (al.includes("skeet")) return "Skeet";
         if (al.includes("trap")) return "Trap";
         if (al.includes("compak") || al.includes("sporting")) return "Compak Sporting";
+
+        // Ilmakivääri / Kivääri
         if (al.includes("ilmakivääri") || al.includes("ikv")) return "Ilmakivääri";
-        if (al.includes("ilmapistooli") || al.includes("ipis")) return "Ilmapistooli";
         if (al.includes("pienoiskivääri") || al.includes("50m kivääri")) {
             if (al.includes("asento") || al.includes("3x") || al.includes("3 x") || al.includes("40")) return "Pienoiskivääri Asento (3x20/3x40)";
             return "Pienoiskivääri Makuu";
         }
+
+        // Pistoolilajit tarkasti yksilöityinä
+        if (al.includes("ilmapistooli") || al.includes("ipis")) return "Ilmapistooli";
         if (al.includes("vapaapistooli")) return "Vapaapistooli";
         if (al.includes("pienoispistooli")) return "Pienoispistooli";
         if (al.includes("isopistooli")) return "Isopistooli";
         if (al.includes("olympiapistooli")) return "Olympiapistooli";
         if (al.includes("vakiopistooli")) return "Vakiopistooli";
+        if (al.includes("pikapistooli")) return "Pikapistooli";
+
+        // Jos API tarjoaa jonkin muun tarkan nimen, käytetään sitä sellaisenaan
+        return apiLaji;
     }
 
-    // 2. Jos API-kenttä oli epämääräinen, tarkastellaan rivin ja kisan nimen sisältöä turvallisesti
+    // 2. Vain jos API-lajitietoa ei ole lainkaan, tarkistetaan rivin sisältö tiukasti
     const txt = JSON.stringify(row).toLowerCase();
     const kisaNimi = etsiKilpailunNimi(row).toLowerCase();
 
     if (txt.includes("skeet") || kisaNimi.includes("skeet")) return "Skeet";
     if (txt.includes("trap") || kisaNimi.includes("trap")) return "Trap";
-    if (txt.includes("compak")) return "Compak Sporting";
 
-    if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) return "Ilmakivääri";
+    if (txt.includes("ilmakivääri") || txt.includes("ikv")) return "Ilmakivääri";
     if (txt.includes("ilmapistooli") || txt.includes("ipis")) return "Ilmapistooli";
 
-    // Pienoiskivääri: oletus on makuu, paitsi jos nimenomaisesti mainitaan asento (3x / asento)
-    if (txt.includes("pienoiskivääri") || txt.includes("pkv") || txt.includes("50m") || txt.includes("300m") || kisaNimi.includes("pienoiskivääri") || kisaNimi.includes("50m")) {
-        const onAsento = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x") || kisaNimi.includes("asento") || kisaNimi.includes("3x");
+    if (txt.includes("pienoiskivääri") || txt.includes("50m")) {
+        const onAsento = txt.includes("asento") || txt.includes("3x") || txt.includes("3 x");
         return onAsento ? "Pienoiskivääri Asento (3x20/3x40)" : "Pienoiskivääri Makuu";
     }
 
@@ -471,11 +479,6 @@ function tunnistaLajiTarkasti(row) {
     if (txt.includes("isopistooli")) return "Isopistooli";
     if (txt.includes("olympiapistooli")) return "Olympiapistooli";
     if (txt.includes("vakiopistooli")) return "Vakiopistooli";
-    if (txt.includes("pistooli")) return "Pistooli (Muu)";
-
-    if (txt.includes("hirvi") || txt.includes("luodikko") || txt.includes("metsästys")) return "Metsästysammunta";
-
-    if (apiLaji && typeof apiLaji === 'string') return apiLaji;
 
     return "Muu laji";
 }
