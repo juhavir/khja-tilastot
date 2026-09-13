@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v70.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v71.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -259,6 +259,7 @@
         #statusText { font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; word-break: break-word; font-weight: 700; }
         .tag { background: var(--input-bg); color: var(--text-main); padding: 2px 6px; font-size: 0.7rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
         .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid var(--card-border); }
+        .tag-tyyppi { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
 
         .info-box { 
             background: rgba(251, 191, 36, 0.1); 
@@ -360,6 +361,7 @@
                             <tr>
                                 <th>Pvm</th>
                                 <th>Kilpailu</th>
+                                <th>Tyyppi</th>
                                 <th>Ampuja</th>
                                 <th>Laji</th>
                                 <th>Sarja</th>
@@ -375,7 +377,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v70.0_FILTER_FIX";
+const KITI_VERSIO = "v71.0_COMPETITION_TYPE";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -426,6 +428,27 @@ function etsiKilpailunNimi(row) {
         if (c.competition_name) return String(c.competition_name);
     }
     return "Kilpailu";
+}
+
+function tunnistaKilpailuTyyppi(row) {
+    if (row.competition_type) return String(row.competition_type);
+    if (row.competitionType) return String(row.competitionType);
+    if (row.type) return String(row.type);
+    
+    if (row.competition && typeof row.competition === 'object') {
+        const c = row.competition;
+        if (c.competition_type) return String(c.competition_type);
+        if (c.competitionType) return String(c.competitionType);
+        if (c.type) return String(c.type);
+    }
+
+    const txt = JSON.stringify(row).toLowerCase();
+    if (txt.includes("sm-") || txt.includes("suomenmestaruus")) return "SM-kilpailu";
+    if (txt.includes("alue") || txt.includes("aluemestaruus")) return "Aluemestaruus";
+    if (txt.includes("seurakilpailu") || txt.includes("seura")) return "Seurakilpailu";
+    if (txt.includes("kansallinen")) return "Kansallinen";
+
+    return "Avoin / Muu";
 }
 
 function tunnistaLaji(row) {
@@ -528,6 +551,7 @@ async function lisaaJaHaeAmpuja() {
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
+                kilpailutyyppi: tunnistaKilpailuTyyppi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
@@ -621,7 +645,6 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const valittuLaji = lajiSelect.value;
     let valittuSarja = sarjaSelect.value;
 
-    // Vain aktiivisten ampujien data otetaan huomioon valikoiden täytössä
     const aktiivisetAmpujatNimet = ampujat.filter(a => a.aktiivinen !== false).map(a => a.nimi);
     const aktiivinenData = tulosData.filter(d => aktiivisetAmpujatNimet.includes(d.ampuja));
 
@@ -642,7 +665,6 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     const aktiivinenLaji = lajiSelect.value;
     const suodatettuDataLajinMukaan = aktiivinenData.filter(d => aktiivinenLaji === "Kaikki" || d.laji === aktiivinenLaji);
     
-    // Näytetään sarjavalikossa VAIN niiden aktiivisten ampujien sarjat, jotka kuuluvat kyseiseen lajiin
     const sarjat = ["Kaikki", ...new Set(suodatettuDataLajinMukaan.map(d => d.sarja))];
     sarjaSelect.innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
 
@@ -792,6 +814,7 @@ function paivitaNakyma() {
         <tr>
             <td><b>${d.pvm}</b></td>
             <td style="color: var(--text-muted);">${d.kilpailu}</td>
+            <td><span class="tag tag-tyyppi">${d.kilpailutyyppi || 'Muu'}</span></td>
             <td><b>${d.ampuja}</b></td>
             <td><span class="tag tag-laji">${d.laji}</span></td>
             <td><span class="tag">${d.sarja}</span></td>
