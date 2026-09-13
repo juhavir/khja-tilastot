@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v82.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v83.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v82.0_EXACT_TYPE_PROPERTY";
+const KITI_VERSIO = "v83.0_ROBUST_FIELD_MAPPING";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -429,22 +429,48 @@ function etsiKilpailunNimi(row) {
 }
 
 function lueLaji(row) {
-    // Haetaan suoraan KITI:n tyyppi-kentästä ilman arvailuja
-    if (row.type !== undefined && row.type !== null) return String(row.type).trim();
-    if (row.event_name !== undefined) return String(row.event_name).trim();
-    if (row.eventName !== undefined) return String(row.eventName).trim();
+    // Tarkistetaan kaikki mahdolliset kentät järjestyksessä ilman arvailuja
+    const kentat = [
+        row.disciplineName,
+        row.discipline_name,
+        row.type,
+        row.sportName,
+        row.sport_name,
+        row.eventName,
+        row.event_name,
+        row.discipline,
+        row.sport
+    ];
+
+    for (const k of kentat) {
+        if (k !== undefined && k !== null) {
+            const val = String(k).trim();
+            if (val.length > 0) return val;
+        }
+    }
     return "Muu laji";
 }
 
 function lueSarja(row) {
-    // Haetaan suoraan KITI:n sarja-kentästä ilman arvailuja
-    if (row.category !== undefined && row.category !== null) {
-        if (typeof row.category === 'object') {
-            return String(row.category.name || row.category.code || "Muu").trim();
+    const kentat = [
+        row.category,
+        row.series,
+        row.className,
+        row.class_name,
+        row.category_code
+    ];
+
+    for (const k of kentat) {
+        if (k !== undefined && k !== null) {
+            if (typeof k === 'object') {
+                const sub = k.name || k.code || "";
+                if (sub) return String(sub).trim();
+            } else {
+                const val = String(k).trim();
+                if (val.length > 0) return val;
+            }
         }
-        return String(row.category).trim();
     }
-    if (row.series !== undefined) return String(row.series).trim();
     return "Muu";
 }
 
@@ -868,7 +894,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                         color: isDark ? '#94a3b8' : '#64748b', 
                         font: { size: 9 },
                         callback: function(value) {
-                            if (naytetaankoSijoituksia) {
+                            if (naytetaankoSijo_oituuksia) {
                                 return `${value}. sija`;
                             }
                             return value;
