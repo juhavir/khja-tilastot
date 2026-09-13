@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v100.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v101.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -21,7 +21,7 @@
             --silver: #cbd5e1;
             --bronze: #d97706;
             --input-bg: #070b16;
-            --table-hover: rgba(56, 189, 248, 0.03);
+            --table-hover: rgba(56, 189, 248, 0.04);
         }
 
         [data-theme="light"] {
@@ -32,38 +32,38 @@
             --primary: #0284c7;
             --primary-hover: #0369a1;
             --text-main: #0f172a;
-            --text-muted: #64748b;
+            --text-muted: #475569;
             --danger: #e11d48;
             --success: #059669;
             --gold: #d97706;
             --silver: #475569;
             --bronze: #b45309;
             --input-bg: #f8fafc;
-            --table-hover: rgba(2, 132, 199, 0.04);
+            --table-hover: rgba(2, 132, 199, 0.05);
         }
 
         * { box-sizing: border-box; }
 
         body { 
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background-color: var(--bg);
             color: var(--text-main); 
             margin: 0; 
-            padding: 10px; 
-            font-size: 0.92rem;
-            line-height: 1.4;
+            padding: 12px; 
+            font-size: 0.95rem;
+            line-height: 1.5;
             min-height: 100vh;
             transition: background-color 0.3s, color 0.3s;
         }
 
-        .container { max-width: 1320px; margin: 0 auto; }
+        .container { max-width: 1360px; margin: 0 auto; }
 
         header { 
             background: var(--card-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--card-border);
-            padding: 14px 20px; 
-            margin-bottom: 12px; 
+            padding: 16px 22px; 
+            margin-bottom: 14px; 
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             display: flex;
@@ -78,37 +78,36 @@
         }
 
         .header-target-icon {
-            width: 46px;
-            height: 46px;
+            width: 48px;
+            height: 48px;
             flex-shrink: 0;
             filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
         }
 
         .header-text h1 { 
             margin: 0; 
-            font-size: 1.3rem; 
+            font-size: 1.4rem; 
             color: var(--primary); 
             font-weight: 800; 
             letter-spacing: -0.3px;
-            font-family: system-ui, -apple-system, sans-serif;
             text-transform: uppercase;
         }
 
         .header-text p { 
-            margin: 2px 0 0 0; 
+            margin: 3px 0 0 0; 
             color: var(--text-muted); 
-            font-size: 0.78rem; 
-            font-weight: 500;
+            font-size: 0.85rem; 
+            font-weight: 600;
         }
 
         .theme-btn {
             background: var(--input-bg);
             border: 1px solid var(--card-border);
             color: var(--text-main);
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             font-weight: 700;
             width: auto;
             margin: 0;
@@ -117,41 +116,41 @@
         }
         .theme-btn:hover { border-color: var(--primary); filter: none; }
 
-        .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-        @media (min-width: 1024px) { .grid { grid-template-columns: 280px 1fr; } }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+        @media (min-width: 1024px) { .grid { grid-template-columns: 300px 1fr; } }
 
         .card { 
             background: var(--card-bg); 
             backdrop-filter: blur(12px);
-            padding: 14px 16px; 
-            margin-bottom: 12px; 
+            padding: 16px; 
+            margin-bottom: 14px; 
             border: 1px solid var(--card-border); 
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
         h2 { 
-            font-size: 0.88rem; 
-            margin: 0 0 10px 0; 
+            font-size: 0.95rem; 
+            margin: 0 0 12px 0; 
             color: var(--primary); 
             border-bottom: 1px solid var(--card-border); 
-            padding-bottom: 6px; 
+            padding-bottom: 8px; 
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: 800;
         }
 
-        label { display: block; margin-top: 8px; font-weight: 700; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        label { display: block; margin-top: 10px; font-weight: 700; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         label:first-of-type { margin-top: 0; }
 
         select, input { 
             width: 100%; 
-            padding: 8px 10px; 
-            margin-top: 4px; 
+            padding: 10px 12px; 
+            margin-top: 5px; 
             background-color: var(--input-bg);
             border: 1px solid var(--card-border); 
             color: var(--text-main);
-            font-size: 0.88rem; 
+            font-size: 0.95rem; 
             border-radius: 6px;
             outline: none;
             transition: all 0.2s;
@@ -168,11 +167,11 @@
             color: #ffffff; 
             font-weight: 800; 
             border: none; 
-            padding: 9px 12px; 
-            font-size: 0.82rem;
+            padding: 11px 14px; 
+            font-size: 0.88rem;
             border-radius: 6px;
             cursor: pointer; 
-            margin-top: 12px; 
+            margin-top: 14px; 
             text-transform: uppercase;
             letter-spacing: 0.8px;
             box-shadow: 0 4px 15px rgba(2, 132, 199, 0.2);
@@ -188,47 +187,48 @@
             color: var(--danger); 
             border: 1px solid rgba(244, 63, 94, 0.3); 
             margin: 0; 
-            padding: 4px 10px; 
-            font-size: 0.72rem; 
+            padding: 5px 10px; 
+            font-size: 0.78rem; 
             width: auto; 
             border-radius: 4px;
             box-shadow: none;
         }
         .btn-danger:hover { background: var(--danger); color: white; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 10px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 14px; }
 
         .stat-box { 
             background: var(--input-bg); 
-            padding: 14px; 
+            padding: 16px; 
             border: 1px solid var(--card-border); 
             border-radius: 8px;
             position: relative;
             overflow: hidden;
         }
 
-        /* Reilusti suuremmat otsikot ja arvot statistiikakorteissa */
-        .stat-header { font-size: 1.05rem; font-weight: 800; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        /* Isommat otsikot statistiikakorteissa */
+        .stat-header { font-size: 1.15rem; font-weight: 800; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         
-        .sub-stats-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; background: rgba(0,0,0,0.06); padding: 8px 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 10px; }
+        /* Entistä suuremmat ja selkeämmät arvot statistiikassa */
+        .sub-stats-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; background: rgba(0,0,0,0.06); padding: 10px 6px; border-radius: 6px; border: 1px solid var(--card-border); margin-bottom: 12px; }
         [data-theme="dark"] .sub-stats-grid { background: rgba(0,0,0,0.3); }
 
         .sub-stat { display: flex; flex-direction: column; cursor: help; }
-        .sub-stat .val { font-weight: 800; font-size: 1.1rem; color: var(--text-main); }
-        .sub-stat .lbl { font-size: 0.65rem; color: var(--text-muted); margin-top: 3px; font-weight: 700; text-transform: uppercase; }
+        .sub-stat .val { font-weight: 800; font-size: 1.25rem; color: var(--text-main); }
+        .sub-stat .lbl { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; font-weight: 700; text-transform: uppercase; }
 
-        .extra-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; font-size: 0.85rem; color: var(--text-muted); background: rgba(0,0,0,0.02); padding: 10px; border-radius: 6px; border: 1px solid var(--card-border); }
         .extra-stats > div { cursor: help; }
-        .extra-stats b { color: var(--text-main); display: block; font-size: 1.05rem; font-weight: 800; margin-top: 3px; }
+        .extra-stats b { color: var(--text-main); display: block; font-size: 1.15rem; font-weight: 800; margin-top: 4px; }
 
-        .chart-container { position: relative; width: 100%; height: 260px; }
+        .chart-container { position: relative; width: 100%; height: 280px; }
 
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 6px; border: 1px solid var(--card-border); }
 
-        /* Kasvatettu taulukon tekstikoko */
-        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left; }
-        th, td { padding: 9px 12px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
-        th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 800; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; }
+        /* Selvästi isompi fontti ja väljemmät solut taulukossa */
+        table { width: 100%; border-collapse: collapse; font-size: 0.98rem; text-align: left; }
+        th, td { padding: 11px 14px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+        th { background-color: var(--input-bg); color: var(--text-muted); font-weight: 800; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background-color: var(--table-hover); }
 
@@ -237,29 +237,29 @@
             justify-content: space-between; 
             align-items: center; 
             background: var(--input-bg); 
-            padding: 8px 10px; 
+            padding: 9px 12px; 
             margin-top: 6px; 
             border: 1px solid var(--card-border);
             border-radius: 6px;
-            font-size: 0.85rem; 
+            font-size: 0.92rem; 
         }
 
         .ampuja-checkbox-wrap {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .ampuja-checkbox-wrap input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             margin: 0;
             cursor: pointer;
             accent-color: var(--primary);
         }
 
-        #statusText { font-size: 0.8rem; color: var(--primary); margin-top: 6px; text-align: center; word-break: break-word; font-weight: 700; }
-        .tag { background: var(--input-bg); color: var(--text-main); padding: 3px 8px; font-size: 0.78rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
+        #statusText { font-size: 0.88rem; color: var(--primary); margin-top: 8px; text-align: center; word-break: break-word; font-weight: 700; }
+        .tag { background: var(--input-bg); color: var(--text-main); padding: 4px 10px; font-size: 0.88rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
         .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid var(--card-border); }
 
         .kiti-link {
@@ -276,9 +276,9 @@
             background: rgba(251, 191, 36, 0.1); 
             border: 1px solid rgba(251, 191, 36, 0.3); 
             color: var(--gold); 
-            padding: 10px 14px; 
-            font-size: 0.85rem; 
-            margin-bottom: 12px;
+            padding: 12px 16px; 
+            font-size: 0.92rem; 
+            margin-bottom: 14px;
             border-radius: 6px;
             font-weight: 600;
         }
@@ -321,11 +321,11 @@
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
 
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 10px;">
                     <label style="margin:0;">Tallennetut (max 5)</label>
-                    <span id="ampujatMaara" style="font-size:0.8rem; color:var(--primary); font-weight:bold;">0/5</span>
+                    <span id="ampujatMaara" style="font-size:0.88rem; color:var(--primary); font-weight:bold;">0/5</span>
                 </div>
-                <div id="ampujatLista" style="margin-top: 4px;"></div>
+                <div id="ampujatLista" style="margin-top: 6px;"></div>
             </div>
 
             <div class="card" style="margin-bottom: 0;">
@@ -388,7 +388,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v100.0_LARGER_UI";
+const KITI_VERSIO = "v101.0_LARGER_UI_FINAL";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -670,14 +670,14 @@ function paivitaAmpujatLista() {
     lisaaBtn.disabled = ampujat.length >= 5;
 
     if (ampujat.length === 0) {
-        lista.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted); margin:2px 0;">Ei tallennettuja.</p>';
+        lista.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted); margin:2px 0;">Ei tallennettuja.</p>';
         return;
     }
     lista.innerHTML = ampujat.map((a, i) => `
         <div class="ampuja-item">
             <div class="ampuja-checkbox-wrap">
                 <input type="checkbox" id="amp_chk_${i}" ${a.aktiivinen !== false ? 'checked' : ''} onchange="vaihdaAmpujanTila(${i}, this.checked)">
-                <label for="amp_chk_${i}" style="margin:0; cursor:pointer; font-weight:700; color:var(--text-main); font-size:0.85rem; text-transform:none;">${a.nimi}</label>
+                <label for="amp_chk_${i}" style="margin:0; cursor:pointer; font-weight:700; color:var(--text-main); font-size:0.9rem; text-transform:none;">${a.nimi}</label>
             </div>
             <button class="btn-danger" onclick="poistaAmpuja(${i})">Poista</button>
         </div>
@@ -829,7 +829,7 @@ async function paivitaNakyma() {
 
             return `
                 <div class="stat-box" style="border-top: 3px solid ${vari};">
-                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
+                    <div class="stat-header" style="color:${vari};">${amp} <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">(${aRivitRajattu.length} kisaa)</span></div>
                     <div class="sub-stats-grid">
                         <div class="sub-stat" title="Voitetut 1. sijat"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
                         <div class="sub-stat" title="Voitetut 2. sijat"><span class="val" style="color:var(--silver);">🥈 ${hopeaa}</span><span class="lbl">2. sijat</span></div>
@@ -848,7 +848,7 @@ async function paivitaNakyma() {
             `;
         }).join("");
     } else {
-        statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:6px;">Ei aktiivisia ampujia valittuna.</div>';
+        statsContainer.innerHTML = '<div style="font-size:0.9rem; color:var(--text-muted); padding:8px;">Ei aktiivisia ampujia valittuna.</div>';
     }
 
     let taulukkoData = data;
@@ -921,11 +921,11 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
             data: pointData,
             borderColor: vari,
             backgroundColor: vari,
-            borderWidth: 2.5,
+            borderWidth: 3,
             tension: 0.15,
             spanGaps: true,
-            pointRadius: 4,
-            pointHoverRadius: 6
+            pointRadius: 4.5,
+            pointHoverRadius: 6.5
         };
     });
 
@@ -942,7 +942,7 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                 legend: { 
                     display: true, 
                     position: 'top',
-                    labels: { color: isDark ? '#f8fafc' : '#0f172a', boxWidth: 12, font: { size: 11, weight: '700' } }
+                    labels: { color: isDark ? '#f8fafc' : '#0f172a', boxWidth: 14, font: { size: 12, weight: '700' } }
                 },
                 tooltip: {
                     callbacks: {
@@ -958,18 +958,18 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
             scales: { 
                 x: { 
                     ticks: {
-                        color: isDark ? '#94a3b8' : '#64748b',
+                        color: isDark ? '#94a3b8' : '#475569',
                         maxRotation: 45,
                         minRotation: 45,
-                        font: { size: 10 }
+                        font: { size: 11, weight: '600' }
                     },
                     grid: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)' }
                 },
                 y: {
                     reverse: naytetaankoSijoituksia,
                     ticks: { 
-                        color: isDark ? '#94a3b8' : '#64748b', 
-                        font: { size: 10 },
+                        color: isDark ? '#94a3b8' : '#475569', 
+                        font: { size: 11, weight: '600' },
                         callback: function(value) {
                             if (naytetaankoSijoituksia) {
                                 return `${value}. sija`;
