@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v65.0</title>
+    <title>KITI Tulosvertailu v66.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
             --bg: #040710;
-            --card-bg: rgba(11, 17, 32, 0.82);
+            --card-bg: rgba(11, 17, 32, 0.85);
             --card-border: rgba(56, 189, 248, 0.18);
             --card-border-glow: rgba(56, 189, 248, 0.45);
             --primary: #38bdf8;
@@ -22,12 +22,11 @@
             --bronze: #d97706;
             --input-bg: #070b16;
             --table-hover: rgba(56, 189, 248, 0.03);
-            --target-color: rgba(56, 189, 248, 0.07);
         }
 
         [data-theme="light"] {
             --bg: #f1f5f9;
-            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-bg: rgba(255, 255, 255, 0.92);
             --card-border: rgba(14, 165, 233, 0.2);
             --card-border-glow: rgba(14, 165, 233, 0.5);
             --primary: #0284c7;
@@ -41,7 +40,6 @@
             --bronze: #b45309;
             --input-bg: #f8fafc;
             --table-hover: rgba(2, 132, 199, 0.04);
-            --target-color: rgba(2, 132, 199, 0.08);
         }
 
         * { box-sizing: border-box; }
@@ -49,11 +47,11 @@
         body { 
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background-color: var(--bg);
-            /* Piirretään tarkka ISSF-ilmataulu taustalle suoralla SVG-datakuviolla */
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175'/%3E%3Ccircle cx='300' cy='300' r='140'/%3E%3Ccircle cx='300' cy='300' r='105'/%3E%3Ccircle cx='300' cy='300' r='70'/%3E%3Ccircle cx='300' cy='300' r='35'/%3E%3Ccircle cx='300' cy='300' r='12' fill='%2338bdf8'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E");
+            /* Piirretään tarkka pyydetyn kaltainen ampumataulu taustalle */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%2338bdf8' stroke-width='1.5'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175' fill='%2338bdf8' fill-opacity='0.08'/%3E%3Ccircle cx='300' cy='300' r='140' fill='%2338bdf8' fill-opacity='0.08'/%3E%3Ccircle cx='300' cy='300' r='105' fill='%2338bdf8' fill-opacity='0.08'/%3E%3Ccircle cx='300' cy='300' r='70' fill='%2338bdf8' fill-opacity='0.08'/%3E%3Ccircle cx='300' cy='300' r='35' fill='%2338bdf8' fill-opacity='0.08'/%3E%3Ccircle cx='300' cy='300' r='15' fill='%2338bdf8' fill-opacity='0.15'/%3E%3Ccircle cx='300' cy='300' r='5' fill='%2338bdf8' fill-opacity='0.3'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='0.8' stroke-opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: center 100px;
-            background-size: 500px 500px;
+            background-position: center 120px;
+            background-size: 550px 550px;
             background-attachment: fixed;
             color: var(--text-main); 
             margin: 0; 
@@ -64,9 +62,8 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Vaaleassa teemassa taulun väri mukautuu automaattisesti */
         [data-theme="light"] body {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%230284c7' stroke-width='2'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175'/%3E%3Ccircle cx='300' cy='300' r='140'/%3E%3Ccircle cx='300' cy='300' r='105'/%3E%3Ccircle cx='300' cy='300' r='70'/%3E%3Ccircle cx='300' cy='300' r='35'/%3E%3Ccircle cx='300' cy='300' r='12' fill='%230284c7'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%230284c7' stroke-width='1.5'%3E%3Ccircle cx='300' cy='300' r='280'/%3E%3Ccircle cx='300' cy='300' r='245'/%3E%3Ccircle cx='300' cy='300' r='210'/%3E%3Ccircle cx='300' cy='300' r='175' fill='%230284c7' fill-opacity='0.05'/%3E%3Ccircle cx='300' cy='300' r='140' fill='%230284c7' fill-opacity='0.05'/%3E%3Ccircle cx='300' cy='300' r='105' fill='%230284c7' fill-opacity='0.05'/%3E%3Ccircle cx='300' cy='300' r='70' fill='%230284c7' fill-opacity='0.05'/%3E%3Ccircle cx='300' cy='300' r='35' fill='%230284c7' fill-opacity='0.05'/%3E%3Ccircle cx='300' cy='300' r='15' fill='%230284c7' fill-opacity='0.1'/%3E%3Ccircle cx='300' cy='300' r='5' fill='%230284c7' fill-opacity='0.2'/%3E%3Cpath d='M300 10v580M10 300h580' stroke-width='0.8' stroke-opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
         }
 
         .container { max-width: 1320px; margin: 0 auto; position: relative; z-index: 2; }
@@ -349,7 +346,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v65.0_FIXED_BG";
+const KITI_VERSIO = "v66.0_TARGET_BG_CLASSIC";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
