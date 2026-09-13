@@ -233,28 +233,6 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Poimitaan nimenomaan KITI:n taulukossa nakyva kilpailupaiva
-function etsiKitiPaivamaara(row) {
-    if (!row) return "";
-    
-    // Suorat KITI-kentat
-    if (row.start_date) return String(row.start_date).substring(0, 10);
-    if (row.competition_start_date) return String(row.competition_start_date).substring(0, 10);
-    if (row.startDate) return String(row.startDate).substring(0, 10);
-    if (row.competitionStartDate) return String(row.competitionStartDate).substring(0, 10);
-
-    // Ali-oliot
-    if (row.competition && typeof row.competition === 'object') {
-        const c = row.competition;
-        if (c.start_date) return String(c.start_date).substring(0, 10);
-        if (c.startDate) return String(c.startDate).substring(0, 10);
-        if (c.date) return String(c.date).substring(0, 10);
-    }
-
-    if (row.date) return String(row.date).substring(0, 10);
-    return "";
-}
-
 function etsiKilpailunNimi(row) {
     if (row.competition_name) return String(row.competition_name);
     if (row.competitionName) return String(row.competitionName);
@@ -312,13 +290,9 @@ async function lisaaJaHaeAmpuja() {
         const uudet = rows.map((row, index) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
-            let pvmPuhdas = etsiKitiPaivamaara(row);
-            let kisaNimi = etsiKilpailunNimi(row);
-
             return {
-                origIndex: index, // KITI:ssa indeksi 0 = Uusin kisa
-                pvm: pvmPuhdas,
-                kilpailu: kisaNimi,
+                pvm: row.pvm_kiti || "2026-01-01",
+                kilpailu: etsiKilpailunNimi(row),
                 ampuja: nimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
@@ -393,7 +367,7 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
     document.getElementById("sarjaSelect").innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
 
     if (asetaUusinOletukseksi && suodatettuData.length > 0) {
-        const uusinRivi = [...suodatettuData].sort((a,b) => a.origIndex - b.origIndex)[0];
+        const uusinRivi = jarjestaJarjestoksenMukaan(suodatettuData, true)[0];
         if (uusinRivi && uusinRivi.sarja) {
             valittuSarja = uusinRivi.sarja;
         }
@@ -407,6 +381,15 @@ function paivitaValikot(asetaUusinOletukseksi = false) {
 function laskeKA(arr) {
     if (!arr || arr.length === 0) return "-";
     return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+}
+
+// Järjestetään täsmällisen päivämäärän (YYYY-MM-DD) mukaan
+function jarjestaJarjestoksenMukaan(dataArr, uusinEnsin = true) {
+    return [...dataArr].sort((a, b) => {
+        const timeA = new Date(a.pvm).getTime() || 0;
+        const timeB = new Date(b.pvm).getTime() || 0;
+        return uusinEnsin ? timeB - timeA : timeA - timeB;
+    });
 }
 
 function paivitaNakyma() {
@@ -434,8 +417,7 @@ function paivitaNakyma() {
 
     if (nimekkäätAmpujat.length > 0) {
         statsContainer.innerHTML = nimekkäätAmpujat.map((amp, idx) => {
-            // Jarjestetaan KITI:n tuoreusjarjestykseen (origIndex 0 = UUSIN)
-            const aTuloksetRivit = data.filter(d => d.ampuja === amp).sort((a,b) => a.origIndex - b.origIndex);
+            const aTuloksetRivit = jarjestaJarjestoksenMukaan(data.filter(d => d.ampuja === amp), true);
             const aTulokset = aTuloksetRivit.map(d => d.tulos);
             
             const kaKaikki = laskeKA(aTulokset);
@@ -461,11 +443,11 @@ function paivitaNakyma() {
         statsContainer.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:10px;">Ei tuloksia valituilla ehtoisilla.</div>';
     }
 
-    // TAULUKKO: Uusin kisa ensin (origIndex 0 -> N)
+    // TAULUKKO: Uusin kisa ylimpänä (esim. 2026-08-15)
     const tbody = document.getElementById("tulosTaulukko");
-    tbody.innerHTML = [...data].sort((a,b) => a.origIndex - b.origIndex).map(d => `
+    tbody.innerHTML = jarjestaJarjestoksenMukaan(data, true).map(d => `
         <tr>
-            <td><b>${d.pvm || 'Kisa'}</b></td>
+            <td><b>${d.pvm}</b></td>
             <td style="color: var(--text-muted);">${d.kilpailu}</td>
             <td><b>${d.ampuja}</b></td>
             <td><span class="tag tag-laji">${d.laji}</span></td>
@@ -485,14 +467,14 @@ function piirraKaavio(data) {
     const ampujatLista = [...new Set(data.map(d => d.ampuja))];
 
     const datasets = ampujatLista.map((amp, idx) => {
-        // GRAAFI: Vanhin kisa vasemmalla (suurin origIndex) -> Uusin kisa oikealla (pienin origIndex = 0)
-        const ampujaData = data.filter(d => d.ampuja === amp).sort((a, b) => b.origIndex - a.origIndex);
+        // GRAAFI: Vanhin kisa vasemmalla -> uusinEnsin = false
+        const ampujaData = jarjestaJarjestoksenMukaan(data.filter(d => d.ampuja === amp), false);
         const vari = variPaletti[idx % variPaletti.length];
         
         return {
             label: amp,
             data: ampujaData.map(d => ({
-                x: d.pvm ? `${d.pvm} (${d.kilpailu})` : d.kilpailu,
+                x: `${d.pvm} (${d.kilpailu})`,
                 y: d.tulos
             })),
             borderColor: vari,
