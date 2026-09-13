@@ -39,6 +39,7 @@
         th { background-color: #f8fafc; color: #475569; font-weight: 600; }
         .ampuja-item { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.9rem; }
         #statusText { font-size: 0.85rem; color: var(--success); margin-top: 10px; font-weight: 600; text-align: center; word-break: break-word; }
+        .tag { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -70,10 +71,14 @@
             <div class="card">
                 <h2>Suodatus</h2>
                 <label for="lajiSelect">Laji:</label>
-                <select id="lajiSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki lajit</option></select>
+                <select id="lajiSelect" onchange="paivitaValikot(); paivitaNakyma();">
+                    <option value="Kaikki">Kaikki lajit</option>
+                </select>
 
                 <label for="sarjaSelect">Sarja:</label>
-                <select id="sarjaSelect" onchange="paivitaNakyma()"><option value="Kaikki">Kaikki sarjat</option></select>
+                <select id="sarjaSelect" onchange="paivitaNakyma();">
+                    <option value="Kaikki">Kaikki sarjat</option>
+                </select>
             </div>
         </div>
 
@@ -110,6 +115,29 @@ function alusta() {
     paivitaNakyma();
 }
 
+function tunnistaLaji(row) {
+    const txt = JSON.stringify(row).toLowerCase();
+    if (txt.includes("ilmakivääri") || txt.includes("ikv") || txt.includes("air rifle")) return "Ilmakivääri";
+    if (txt.includes("ilmapistooli") || txt.includes("ipis") || txt.includes("air pistol")) return "Ilmapistooli";
+    if (txt.includes("kivääri")) return "Kivääri";
+    if (txt.includes("pistooli")) return "Pistooli";
+    
+    return row.eventName || row.sportName || row.sport || "Muu laji";
+}
+
+function tunnistaSarja(row) {
+    if (row.category && typeof row.category === 'object') {
+        return row.category.code || row.category.name || "Muu";
+    }
+    if (row.category) return String(row.category);
+    if (row.series) return String(row.series);
+    if (row.class_name) return String(row.class_name);
+    if (row.className) return String(row.className);
+    if (row.category_code) return String(row.category_code);
+    
+    return "Muu";
+}
+
 async function lisaaJaHaeAmpuja() {
     const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
@@ -138,20 +166,12 @@ async function lisaaJaHaeAmpuja() {
         const uudet = rows.map(row => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
-            // Poimitaan sarjanimi eri mahdollisista KITI-rajapinnan rakenteista
-            let sarjaNimi = "Muu";
-            if (row.category && typeof row.category === 'object') sarjaNimi = row.category.name || row.category.code || "Muu";
-            else if (row.category) sarjaNimi = String(row.category);
-            else if (row.series) sarjaNimi = String(row.series);
-            else if (row.class_name) sarjaNimi = String(row.class_name);
-            else if (row.className) sarjaNimi = String(row.className);
-
             return {
                 pvm: String(row.competitionStartDate || row.startDate || row.date || "2026-01-01").substring(0, 10),
                 kilpailu: String(row.competitionName || row.name || "Kilpailu"),
                 ampuja: nimi,
-                laji: String(row.eventName || row.sport || row.sportName || "Ampumaurheilu"),
-                sarja: sarjaNimi,
+                laji: tunnistaLaji(row),
+                sarja: tunnistaSarja(row),
                 tulos: parseFloat(String(tRaw).replace(",", "."))
             };
         }).filter(r => r.tulos > 0);
@@ -211,17 +231,19 @@ function paivitaAmpujatLista() {
 }
 
 function paivitaValikot() {
-    // Päivitetään lajivalikko
-    const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
-    const nykyinenLaji = document.getElementById("lajiSelect").value;
-    document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
-    if (lajit.includes(nykyinenLaji)) document.getElementById("lajiSelect").value = nykyinenLaji;
+    const valittuLaji = document.getElementById("lajiSelect").value;
+    const valittuSarja = document.getElementById("sarjaSelect").value;
 
-    // Päivitetään sarjavalikko
-    const sarjat = ["Kaikki", ...new Set(tulosData.map(d => d.sarja))];
-    const nykyinenSarja = document.getElementById("sarjaSelect").value;
+    // 1. Lajit
+    const lajit = ["Kaikki", ...new Set(tulosData.map(d => d.laji))];
+    document.getElementById("lajiSelect").innerHTML = lajit.map(l => `<option value="${l}">${l}</option>`).join("");
+    if (lajit.includes(valittuLaji)) document.getElementById("lajiSelect").value = valittuLaji;
+
+    // 2. Sarjat (suodatetaan valitun lajin mukaan)
+    const suodatettuData = tulosData.filter(d => valittuLaji === "Kaikki" || d.laji === valittuLaji);
+    const sarjat = ["Kaikki", ...new Set(suodatettuData.map(d => d.sarja))];
     document.getElementById("sarjaSelect").innerHTML = sarjat.map(s => `<option value="${s}">${s}</option>`).join("");
-    if (sarjat.includes(nykyinenSarja)) document.getElementById("sarjaSelect").value = nykyinenSarja;
+    if (sarjat.includes(valittuSarja)) document.getElementById("sarjaSelect").value = valittuSarja;
 }
 
 function paivitaNakyma() {
@@ -249,8 +271,8 @@ function paivitaNakyma() {
             <td>${d.pvm}</td>
             <td style="color: #64748b;">${d.kilpailu}</td>
             <td><b>${d.ampuja}</b></td>
-            <td>${d.laji}</td>
-            <td><span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">${d.sarja}</span></td>
+            <td><span class="tag" style="background:#dbeafe; color:#1e40af;">${d.laji}</span></td>
+            <td><span class="tag">${d.sarja}</span></td>
             <td><b>${d.tulos}</b></td>
         </tr>
     `).join("");
