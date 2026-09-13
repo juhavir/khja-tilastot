@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v84.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v85.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -375,7 +375,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v84.0_UNIVERSAL_PARSER";
+const KITI_VERSIO = "v85.0_NESTED_COMPETITION_FIX";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -424,6 +424,7 @@ function etsiKilpailunNimi(row) {
         const c = row.competition;
         if (c.name) return String(c.name);
         if (c.competition_name) return String(c.competition_name);
+        if (c.title) return String(c.title);
     }
     return "Kilpailu";
 }
@@ -437,8 +438,8 @@ function puraTekstiksi(arvo) {
 }
 
 function lueLaji(row) {
-    // Käydään läpi mahdolliset lajikentät (tukee sekä merkkijonoja että olioita)
-    const kentat = [
+    // 1. Tarkistetaan suorat pääkentät
+    const paakentat = [
         row.type,
         row.disciplineName,
         row.discipline_name,
@@ -449,14 +450,30 @@ function lueLaji(row) {
         row.discipline,
         row.sport
     ];
-
-    for (const k of kentat) {
+    for (const k of paakentat) {
         const tulos = puraTekstiksi(k);
         if (tulos.length > 0) return tulos;
     }
-    
-    // Debuggausta varten tulostetaan konsoliin rivi, jos lajia ei löydy
-    console.warn("Lajia ei löytynyt riviltä:", row);
+
+    // 2. Tarkistetaan kilpailu-olion sisään pesiytyneet kentät (row.competition)
+    if (row.competition && typeof row.competition === 'object') {
+        const c = row.competition;
+        const alikentat = [c.type, c.disciplineName, c.discipline_name, c.sportName, c.sport_name, c.eventName, c.event_name, c.discipline, c.sport];
+        for (const k of alikentat) {
+            const tulos = puraTekstiksi(k);
+            if (tulos.length > 0) return tulos;
+        }
+    }
+
+    // 3. Viimeisenä turvana etsitään josko jokin kenttä rivillä sisältäisi tuttuja lajitermejä
+    const jsonStr = JSON.stringify(row).toLowerCase();
+    if (jsonStr.includes("isopistooli")) return "25m isopistooli";
+    if (jsonStr.includes("vakiopistooli")) return "25m vakiopistooli";
+    if (jsonStr.includes("pienoispistooli")) return "25m pistooli";
+    if (jsonStr.includes("50m pistooli") || jsonStr.includes("vapaapistooli")) return "50m pistooli";
+    if (jsonStr.includes("ilmapistooli")) return "10m ilmapistooli";
+    if (jsonStr.includes("ilmakivääri")) return "Ilmakivääri";
+
     return "Muu laji";
 }
 
@@ -473,6 +490,12 @@ function lueSarja(row) {
         const tulos = puraTekstiksi(k);
         if (tulos.length > 0) return tulos;
     }
+
+    if (row.competition && typeof row.competition === 'object') {
+        const tulos = puraTekstiksi(row.competition.category || row.competition.series);
+        if (tulos.length > 0) return tulos;
+    }
+
     return "Muu";
 }
 
