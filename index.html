@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v20.0</title>
+    <title>KITI Tulosvertailu v21.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -213,11 +213,9 @@
         <div>
             <div class="card">
                 <h2>Lisää ampuja</h2>
-                <label for="uusiNimi">Nimi</label>
-                <input type="text" id="uusiNimi" placeholder="Esim. Matti Meikäläinen">
-
                 <label for="uusiId">Sportti-ID</label>
                 <input type="text" id="uusiId" placeholder="Esim. 60332562">
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Nimi haetaan automaattisesti tuloksista.</p>
 
                 <button id="lisaaBtn" onclick="lisaaJaHaeAmpuja()">+ Hae tulokset</button>
                 <div id="statusText"></div>
@@ -288,7 +286,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v20.0_DYNAMIC_STATS";
+const KITI_VERSIO = "v21.0_AUTO_NAME";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -318,6 +316,17 @@ function etsiKilpailunNimi(row) {
         if (c.competition_name) return String(c.competition_name);
     }
     return "Kilpailu";
+}
+
+function etsiAmpujanNimi(row, oletusId) {
+    if (row.shooter_name) return String(row.shooter_name);
+    if (row.shooterName) return String(row.shooterName);
+    if (row.name && !row.competition_name && !row.competitionName) return String(row.name);
+    if (row.competitor && typeof row.competitor === 'object') {
+        if (row.competitor.name) return String(row.competitor.name);
+        if (row.competitor.fullName) return String(row.competitor.fullName);
+    }
+    return `Ampuja ${oletusId}`;
 }
 
 function tunnistaLaji(row) {
@@ -383,9 +392,8 @@ async function lisaaJaHaeAmpuja() {
         return;
     }
 
-    const nimi = document.getElementById("uusiNimi").value.trim();
     const id = document.getElementById("uusiId").value.trim();
-    if (!nimi || !id) return alert("Nimi ja Sportti-ID vaaditaan!");
+    if (!id) return alert("Sportti-ID vaaditaan!");
 
     const statusEl = document.getElementById("statusText");
     statusEl.innerText = `Haetaan...`;
@@ -403,13 +411,20 @@ async function lisaaJaHaeAmpuja() {
 
         const rows = Array.isArray(resData) ? resData : (resData.content || resData.results || resData.data || []);
 
+        if (rows.length === 0) {
+            throw new Error("Antamallasi Sportti-ID:llä ei löytynyt tuloksia.");
+        }
+
+        // Otetaan nimi automaattisesti ensimmäisestä rivistä
+        let haettuNimi = etsiAmpujanNimi(rows[0], id);
+
         const uudet = rows.map((row) => {
             const tRaw = row.score !== undefined ? row.score : (row.totalScore !== undefined ? row.totalScore : (row.result !== undefined ? row.result : 0));
             
             return {
                 pvm: tunnistaKisanPaivamaara(row),
                 kilpailu: etsiKilpailunNimi(row),
-                ampuja: nimi,
+                ampuja: haettuNimi,
                 laji: tunnistaLaji(row),
                 sarja: tunnistaSarja(row),
                 tulos: parseFloat(String(tRaw).replace(",", "."))
@@ -418,22 +433,21 @@ async function lisaaJaHaeAmpuja() {
 
         if (uudet.length > 0) {
             if (!ampujat.some(a => a.id === id)) {
-                ampujat.push({ nimi, id, aktiivinen: true });
+                ampujat.push({ nimi: haettuNimi, id, aktiivinen: true });
                 localStorage.setItem("kiti_ampujat", JSON.stringify(ampujat));
             }
 
-            tulosData = [...tulosData.filter(d => d.ampuja !== nimi), ...uudet];
+            tulosData = [...tulosData.filter(d => d.ampuja !== haettuNimi), ...uudet];
             localStorage.setItem("kiti_tulokset", JSON.stringify(tulosData));
 
-            statusEl.innerText = `Löytyi ${uudet.length} tulosta.`;
+            statusEl.innerText = `Löytyi: ${haettuNimi} (${uudet.length} tulosta).`;
             
-            document.getElementById("uusiNimi").value = "";
             document.getElementById("uusiId").value = "";
             paivitaAmpujatLista();
             paivitaValikot(true);
             paivitaNakyma();
         } else {
-            statusEl.innerText = "Ei tuloksia.";
+            statusEl.innerText = "Ei kelvollisia tuloksia.";
         }
     } catch (e) {
         statusEl.innerText = `Virhe: ${e.message}`;
@@ -554,7 +568,6 @@ function paivitaNakyma() {
         infoEl.style.display = "none";
     }
 
-    // Perussuodatus lajille ja sarjalle
     let data = tulosData.filter(d => 
         aktiivisetAmpujatNimet.includes(d.ampuja) &&
         (valittuLaji === "Kaikki" || d.laji === valittuLaji) &&
@@ -567,7 +580,6 @@ function paivitaNakyma() {
         statsContainer.innerHTML = aktiivisetAmpujatNimet.map((amp, idx) => {
             const aRivitKaikki = jarjestaPvmMukaan(data.filter(d => d.ampuja === amp), true);
             
-            // Rajataan ensin vasemman paneelin kisa-määrän mukaan
             let aRivitRajattu = aRivitKaikki;
             if (maaraValinta !== "kaikki") {
                 const rajoitus = parseInt(maaraValinta, 10);
@@ -576,11 +588,6 @@ function paivitaNakyma() {
 
             const aTuloksetRajatut = aRivitRajattu.map(d => d.tulos);
             
-            // Lasketaan dynaamisesti keskiarvot valitun rajauksen sisällä:
-            // 1. Laatikko: Kaikki (valitun rajauksen keskiarvo)
-            // 2. Laatikko: Viimeiset 3 (tai rajauksen maksimi)
-            // 3. Laatikko: Viimeiset 5
-            // 4. Laatikko: Viimeiset 10
             const kaValitut = laskeKA(aTuloksetRajatut);
             const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
             const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
