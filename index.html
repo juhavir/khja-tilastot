@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KITI Tulosvertailu v42.0</title>
+    <title>KITI Tulosvertailu v43.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -288,7 +288,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v42.0_SORTED_RANK";
+const KITI_VERSIO = "v43.0_STABLE_RANK";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -307,7 +307,7 @@ function alusta() {
     paivitaNakyma();
 }
 
-// Haetaan sijoitus lataamalla sivut, järjestämällä tulokset parhaasta huonoimpaan ja poimimalla uniikit ampujat
+// Varma sijoituksen haku: käsittelee joustavasti kaikki KITI-rajapinnan palautusmuodot
 async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
     if (!sportId || !categoryId) return "-";
 
@@ -319,13 +319,13 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
 
         let kaikkiRivit = [];
 
-        // Ladataan useampi sivu (esim. 4 sivua = 100 parasta tulosta)
-        for (let page = 1; page <= 4; page++) {
+        for (let page = 1; page <= 5; page++) {
             const url = `/api/statistics?sport=${sportId}&category=${categoryId}&page=${page}&nocache=${Date.now()}`;
             const response = await fetch(url);
             if (!response.ok) break;
 
             const data = await response.json();
+            // Varmistetaan tuki erilaisille JSON-rakenteille (taulukko, .content, .results, .data)
             const rows = Array.isArray(data) ? data : (data.content || data.results || data.data || []);
             if (rows.length === 0) break;
 
@@ -334,7 +334,6 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
 
         if (kaikkiRivit.length === 0) return "-";
 
-        // Muunnetaan rivit ja järjestetään tuloksen mukaan laskevasti (suurin tulos ensin)
         const prosessoidutRivit = kaikkiRivit.map(r => {
             const tRaw = r.score !== undefined ? r.score : (r.totalScore !== undefined ? r.totalScore : (r.result !== undefined ? r.result : 0));
             const tulos = parseFloat(String(tRaw).replace(",", ".")) || 0;
@@ -348,13 +347,12 @@ async function haeTarkkaSijoitus(ampujaNimi, sportId, categoryId) {
                 nimi = String(r.shooter_name || r.competitor_name || r.name || "").trim();
             }
 
-            return { nimi: nimi.toLowerCase(), tulos, raw: r };
+            return { nimi: nimi.toLowerCase(), tulos };
         }).filter(r => r.nimi.length > 0);
 
-        // Järjestetään parhaan tuloksen mukaan (korkein pistemäärä ylimpänä)
+        // Järjestetään tuloksen mukaan laskevasti (suurin tulos ensin)
         prosessoidutRivit.sort((a, b) => b.tulos - a.tulos);
 
-        // Lasketaan uniikit ampujat oikeassa ranking-järjestyksessä
         const nahdytUrheilijat = new Set();
         let sijoitusLaskuri = 0;
 
