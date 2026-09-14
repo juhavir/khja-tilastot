@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v105.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v106.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -215,9 +215,9 @@
         .sub-stat .val { font-weight: 800; font-size: 1.35rem; color: var(--text-main); }
         .sub-stat .lbl { font-size: 0.78rem; color: var(--text-muted); margin-top: 5px; font-weight: 700; text-transform: uppercase; }
 
-        .extra-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; font-size: 0.92rem; color: var(--text-muted); background: rgba(0,0,0,0.02); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border); }
+        .extra-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; font-size: 0.88rem; color: var(--text-muted); background: rgba(0,0,0,0.02); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border); }
         .extra-stats > div { cursor: help; }
-        .extra-stats b { color: var(--text-main); display: block; font-size: 1.25rem; font-weight: 800; margin-top: 5px; }
+        .extra-stats b { color: var(--text-main); display: block; font-size: 1.2rem; font-weight: 800; margin-top: 5px; }
 
         .chart-container { position: relative; width: 100%; height: 300px; }
 
@@ -257,6 +257,7 @@
         #statusText { font-size: 0.95rem; color: var(--primary); margin-top: 10px; text-align: center; word-break: break-word; font-weight: 700; }
         .tag { background: var(--input-bg); color: var(--text-main); padding: 5px 12px; font-size: 0.95rem; font-weight: 700; border-radius: 4px; display: inline-block; border: 1px solid var(--card-border); }
         .tag-laji { background: rgba(56, 189, 248, 0.1); color: var(--primary); border: 1px solid var(--card-border); }
+        .tag-pb { background: rgba(251, 191, 36, 0.15); color: var(--gold); border: 1px solid rgba(251, 191, 36, 0.4); font-weight: 800; }
 
         .kiti-link {
             color: var(--primary);
@@ -278,6 +279,24 @@
             border-radius: 6px;
             font-weight: 600;
         }
+
+        .h2h-card {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            text-align: center;
+        }
+        .h2h-stat { font-size: 1.3rem; font-weight: 800; }
+        .h2h-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+
+        .club-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 8px; }
+        .club-box { background: rgba(0,0,0,0.04); border: 1px solid var(--card-border); padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; }
+        [data-theme="dark"] .club-box { background: rgba(0,0,0,0.25); }
     </style>
 </head>
 <body data-theme="dark">
@@ -324,7 +343,7 @@
                 <div id="ampujatLista" style="margin-top: 8px;"></div>
             </div>
 
-            <div class="card" style="margin-bottom: 0;">
+            <div class="card">
                 <h2>Suodatus</h2>
                 <label for="lajiSelect">Laji</label>
                 <select id="lajiSelect" onchange="paivitaValikot(false); paivitaNakyma();">
@@ -344,6 +363,12 @@
                     <option value="10">Viimeiset 10 kilpailua</option>
                 </select>
             </div>
+
+            <!-- Seurakohtainen yhteenveto (Club Summary) -->
+            <div class="card" style="margin-bottom: 0;">
+                <h2>Seurayhteenveto</h2>
+                <div id="seuraYhteenveto" class="club-grid"></div>
+            </div>
         </div>
 
         <!-- Pääsisältö -->
@@ -351,6 +376,9 @@
             <div id="vertailuIlmoitus" class="info-box" style="display: none;">
                 ⚠️ Vertailua varten valitse vasemmalta tietty <b>Laji</b> ja <b>Sarja</b>.
             </div>
+
+            <!-- Head-to-Head (H2H) osio -->
+            <div id="h2hSection" class="h2h-card" style="display: none;"></div>
 
             <div class="card">
                 <h2>Statistiikka</h2>
@@ -384,7 +412,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v105.0_COLOR_CODED_TABLE_ROWS";
+const KITI_VERSIO = "v106.0_ADVANCED_ANALYTICS";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -758,10 +786,95 @@ function laskeKisakunto(arr) {
 }
 
 function laskeHajonta(arr) {
-    if (!arr || arr.length < 2) return "0.0";
+    if (!arr || arr.length < 2) return 0;
     const ka = arr.reduce((a, b) => a + b, 0) / arr.length;
     const neliotSumma = arr.reduce((a, b) => a + Math.pow(b - ka, 2), 0);
-    return Math.sqrt(neliotSumma / arr.length).toFixed(1);
+    return Math.sqrt(neliotSumma / arr.length);
+}
+
+// UUSI: Tasaisuusindeksin laskenta ( Consistency Score 0 - 100% )
+function laskeTasaisuus(arr) {
+    if (!arr || arr.length < 2) return "-";
+    const ka = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const hajonta = laskeHajonta(arr);
+    if (ka === 0) return "-";
+    const varianssiProsentti = (hajonta / ka) * 100;
+    const tasaisuus = Math.max(0, Math.min(100, 100 - (varianssiProsentti * 4))).toFixed(0);
+    return `${tasaisuus}%`;
+}
+
+// UUSI: Head-to-Head (H2H) vertailulaskuri
+function paivitaH2H(aktiivisetAmpujat, data) {
+    const h2hEl = document.getElementById("h2hSection");
+    if (aktiivisetAmpujat.length !== 2) {
+        h2hEl.style.display = "none";
+        return;
+    }
+
+    const amp1 = aktiivisetAmpujat[0].nimi;
+    const amp2 = aktiivisetAmpujat[1].nimi;
+
+    const data1 = data.filter(d => d.ampuja === amp1);
+    const data2 = data.filter(d => d.ampuja === amp2);
+
+    let amp1Voitot = 0;
+    let amp2Voitot = 0;
+    let tasan = 0;
+
+    // Keskinäiset kisavertailut
+    data1.forEach(r1 => {
+        const r2 = data2.find(d => d.kilpailu === r1.kilpailu && d.laji === r1.laji);
+        if (r2) {
+            if (r1.tulos > r2.tulos) amp1Voitot++;
+            else if (r2.tulos > r1.tulos) amp2Voitot++;
+            else tasan++;
+        }
+    });
+
+    const ka1 = laskeKA(data1.map(d => d.tulos));
+    const ka2 = laskeKA(data2.map(d => d.tulos));
+
+    h2hEl.style.display = "flex";
+    h2hEl.innerHTML = `
+        <div>
+            <div class="h2h-stat" style="color:${variPaletti[0]};">${amp1}</div>
+            <div class="h2h-label">Keskiarvo: ${ka1}</div>
+        </div>
+        <div>
+            <div class="h2h-stat">${amp1Voitot} - ${amp2Voitot} ${tasan > 0 ? `(${tasan} tasan)` : ''}</div>
+            <div class="h2h-label">Keskinäiset voitot</div>
+        </div>
+        <div>
+            <div class="h2h-stat" style="color:${variPaletti[1]};">${amp2}</div>
+            <div class="h2h-label">Keskiarvo: ${ka2}</div>
+        </div>
+    `;
+}
+
+// UUSI: Seurakohtaisen yhteenvedon päivitys
+function paivitaSeuraYhteenveto(data) {
+    const seuraEl = document.getElementById("seuraYhteenveto");
+    if (!data || data.length === 0) {
+        seuraEl.innerHTML = '<span style="font-size:0.85rem; color:var(--text-muted);">Ei tietoja.</span>';
+        return;
+    }
+
+    const seurat = {};
+    data.forEach(d => {
+        const s = d.seura || "Ei seuraa";
+        if (!seurat[s]) seurat[s] = [];
+        seurat[s].push(d.tulos);
+    });
+
+    seuraEl.innerHTML = Object.keys(seurat).map(s => {
+        const ka = laskeKA(seurat[s]);
+        return `
+            <div class="club-box">
+                <b>${s}</b>
+                <div style="color:var(--text-muted); font-size:0.8rem; margin-top:2px;">KA: <b style="color:var(--text-main);">${ka}</b> (${seurat[s].length} suoritusta)</div>
+            </div>
+        `;
+    }).join("");
 }
 
 async function paivitaNakyma() {
@@ -786,7 +899,19 @@ async function paivitaNakyma() {
         (valittuSarja === "Kaikki" || d.sarja === valittuSarja)
     );
 
+    // Päivitetään H2H ja Seurayhteenveto
+    paivitaH2H(aktiivisetAmpujat, data);
+    paivitaSeuraYhteenveto(data);
+
     const statsContainer = document.getElementById("ampujatStats");
+
+    // Lasketaan lajikohtaiset henkilökohtaiset ennätykset (PB)
+    const ampujaEnnatykset = {};
+    aktiivisetAmpujatNimet.forEach(amp => {
+        const aData = tulosData.filter(d => d.ampuja === amp);
+        const maxTulos = aData.length > 0 ? Math.max(...aData.map(d => d.tulos)) : 0;
+        ampujaEnnatykset[amp] = maxTulos;
+    });
 
     if (aktiivisetAmpujat.length > 0) {
         statsContainer.innerHTML = aktiivisetAmpujat.map((ampObj, idx) => {
@@ -819,9 +944,8 @@ async function paivitaNakyma() {
             const lbl2 = "Viimeiset 3";
             const lbl3 = "Viimeiset 5";
 
-            const pb = aRivitKaikki.length > 0 ? Math.max(...aRivitKaikki.map(d => d.tulos)) : "-";
+            const pb = ampujaEnnatykset[amp] || "-";
             const valitunAjanParas = aTuloksetRajatut.length > 0 ? Math.max(...aTuloksetRajatut) : pb;
-            const valitunAjanHeikoin = aTuloksetRajatut.length > 0 ? Math.min(...aTuloksetRajatut) : "-";
 
             let trendiTxt = "-";
             if (aRivitRajattu.length >= 2) {
@@ -829,7 +953,8 @@ async function paivitaNakyma() {
                 trendiTxt = ero > 0 ? `+${ero}` : `${ero}`;
             }
 
-            const hajonta = laskeHajonta(aTuloksetRajatut);
+            const hajonta = laskeHajonta(aTuloksetRajatut).toFixed(1);
+            const tasaisuus = laskeTasaisuus(aTuloksetRajatut);
             const vari = variPaletti[idx % variPaletti.length];
 
             return `
@@ -848,6 +973,7 @@ async function paivitaNakyma() {
                         <div title="Koko historian korkein tulos">Ennätys (PB)<b>${pb}</b></div>
                         <div title="Valitun ajanjakson paras tulos">Valitun paras<b>${valitunAjanParas}</b></div>
                         <div title="Tulosten keskihajonta sekä viimeisimmän kisan muutos">Hajonta / Trendi<b>±${hajonta} (${trendiTxt})</b></div>
+                        <div title="Suoritusvarmuus ja tasaisuus">Tasaisuus<b>${tasaisuus}</b></div>
                     </div>
                 </div>
             `;
@@ -876,10 +1002,12 @@ async function paivitaNakyma() {
             kilpailuSolu = `<a href="https://kiti.ampumaurheiluliitto.fi/#/competition/${d.kisaId}" target="_blank" class="kiti-link">${d.kilpailu} ↗</a>`;
         }
 
-        // Haetaan ampujan indeksi värin määrittelyä varten
         const ampIndex = aktiivisetAmpujat.findIndex(a => a.nimi === d.ampuja);
         const vari = variPaletti[ampIndex !== -1 ? (ampIndex % variPaletti.length) : 0];
-        const tausta vari = isDark ? `rgba(2, 132, 199, 0.03)` : `rgba(2, 132, 199, 0.02)`;
+
+        // UUSI: Ennätysmerkintä taulukkoon
+        const isPB = (d.tulos === ampujaEnnatykset[d.ampuja] && d.tulos > 0);
+        const pbTag = isPB ? `<span class="tag tag-pb" title="Henkilökohtainen ennätys">⭐ PB</span>` : '';
 
         return `
             <tr style="border-left: 4px solid ${vari}; background-color: ${isDark ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.01)'};">
@@ -889,15 +1017,15 @@ async function paivitaNakyma() {
                 <td><span class="tag">${d.seura || '-'}</span></td>
                 <td><span class="tag tag-laji">${d.laji}</span></td>
                 <td><span class="tag">${d.sarja}</span></td>
-                <td><b>${d.tulos}</b> ${d.sija ? `(Sija ${d.sija})` : ''}</td>
+                <td><b>${d.tulos}</b> ${pbTag} ${d.sija ? `(Sija ${d.sija})` : ''}</td>
             </tr>
         `;
     }).join("");
 
-    piirraKaavio(taulukkoData, valittuLaji, valittuSarja);
+    piirraKaavio(taulukkoData, valittuLaji, valittuSarja, ampujaEnnatykset);
 }
 
-function piirraKaavio(data, valittuLaji, valittuSarja) {
+function piirraKaavio(data, valittuLaji, valittuSarja, ampujaEnnatykset) {
     const ctx = document.getElementById('tulosKaavio').getContext('2d');
     
     if (myChart) { myChart.destroy(); }
@@ -918,9 +1046,17 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
         const ampujaRivit = data.filter(d => d.ampuja === amp);
         const vari = variPaletti[idx % variPaletti.length];
         
+        const pointRadii = [];
         const pointData = labels.map(lbl => {
             const hit = ampujaRivit.find(d => d.kilpailu === lbl);
-            if (!hit) return null;
+            if (!hit) {
+                pointRadii.push(5);
+                return null;
+            }
+
+            // UUSI: Suurempi piste ja korostus kaaviossa jos tulos on PB
+            const isPB = (!naytetaankoSijoituksia && hit.tulos === ampujaEnnatykset[amp]);
+            pointRadii.push(isPB ? 9 : 5);
 
             if (naytetaankoSijoituksia) {
                 return hit.sija ? hit.sija : null;
@@ -937,8 +1073,8 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
             borderWidth: 3.5,
             tension: 0.15,
             spanGaps: true,
-            pointRadius: 5,
-            pointHoverRadius: 7
+            pointRadius: pointRadii,
+            pointHoverRadius: 8
         };
     });
 
@@ -963,10 +1099,14 @@ function piirraKaavio(data, valittuLaji, valittuSarja) {
                             return context[0].label || "";
                         },
                         label: function(context) {
+                            const val = context.raw;
+                            const ampName = context.dataset.label.replace(" (Sijoitukset)", "");
+                            const isPB = (!naytetaankoSijoituksia && val === ampujaEnnatykset[ampName]);
+                            
                             if (naytetaankoSijoituksia) {
-                                return `${context.dataset.label}: Sija ${context.raw}`;
+                                return `${context.dataset.label}: Sija ${val}`;
                             }
-                            return `${context.dataset.label}: ${context.raw} pnt`;
+                            return `${context.dataset.label}: ${val} pnt ${isPB ? '⭐ (Ennätys!)' : ''}`;
                         }
                     }
                 }
