@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v107.0</title>
+    <title>Ampumaurheilun tulostilastojen statistiikkaohjelma v108.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
@@ -59,7 +59,6 @@
 
         .container { max-width: 1400px; margin: 0 auto; }
 
-        /* Valon heijastus- / lasiefekti korteissa */
         .glass-card {
             background: var(--card-bg);
             backdrop-filter: blur(16px);
@@ -192,7 +191,6 @@
         }
         .btn-danger:hover { background: var(--danger); color: white; }
 
-        /* Statistiikkakortin uusi selkeä layout */
         .stats-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px; }
 
         .stat-card-header { 
@@ -214,9 +212,56 @@
             padding: 14px; 
         }
 
-        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        /* Hover Tooltip -tyylit statistiikoille */
+        .tooltip-wrap {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.2);
+            padding-bottom: 2px;
+        }
+
+        .tooltip-wrap::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%) translateY(4px);
+            background: rgba(15, 23, 42, 0.95);
+            color: #f8fafc;
+            border: 1px solid var(--card-border);
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            border-radius: 8px;
+            white-space: normal;
+            width: max-content;
+            max-width: 240px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease-in-out;
+            pointer-events: none;
+            z-index: 100;
+            line-height: 1.3;
+        }
+
+        .tooltip-wrap:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .info-icon {
+            font-size: 0.75rem;
+            color: var(--primary);
+            margin-left: 3px;
+            opacity: 0.7;
+        }
+
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .stat-row:last-child { margin-bottom: 0; }
-        .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+        .stat-label { font-size: 0.88rem; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; }
         .stat-value { font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
 
         .medals-flex { display: flex; justify-content: space-around; text-align: center; }
@@ -406,7 +451,7 @@
 </div>
 
 <script>
-const KITI_VERSIO = "v107.0_GLASS_UI";
+const KITI_VERSIO = "v108.0_TOOLTIPS";
 if (localStorage.getItem("kiti_versio") !== KITI_VERSIO) {
     localStorage.clear();
     localStorage.setItem("kiti_versio", KITI_VERSIO);
@@ -912,8 +957,6 @@ async function paivitaNakyma() {
             
             const kaValitut = laskeKA(aTuloksetRajatut);
             const kisakunto = laskeKisakunto(aTuloksetRajatut);
-            const kaV3 = laskeKA(aTuloksetRajatut.slice(0, 3));
-            const kaV5 = laskeKA(aTuloksetRajatut.slice(0, 5));
 
             let kultaa = 0;
             let hopeaa = 0;
@@ -945,28 +988,46 @@ async function paivitaNakyma() {
                         <!-- Mitalit & Sijat -->
                         <div class="stat-block">
                             <div class="medals-flex">
-                                <div class="medal-item"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
-                                <div class="medal-item"><span class="val" style="color:var(--silver);">🥈 ${hopeaa}</span><span class="lbl">2. sijat</span></div>
-                                <div class="medal-item"><span class="val" style="color:var(--bronze);">🥉 ${pronssia}</span><span class="lbl">3. sijat</span></div>
+                                <div class="medal-item tooltip-wrap" data-tooltip="Ensimmäiset sijat valituissa kilpailuissa"><span class="val" style="color:var(--gold);">🏆 ${kultaa}</span><span class="lbl">1. sijat</span></div>
+                                <div class="medal-item tooltip-wrap" data-tooltip="Toiset sijat valituissa kilpailuissa"><span class="val" style="color:var(--silver);">🥈 ${hopeaa}</span><span class="lbl">2. sijat</span></div>
+                                <div class="medal-item tooltip-wrap" data-tooltip="Kolmannet sijat valituissa kilpailuissa"><span class="val" style="color:var(--bronze);">🥉 ${pronssia}</span><span class="lbl">3. sijat</span></div>
                             </div>
                         </div>
 
                         <!-- Keskiarvot & Kunto -->
                         <div class="stat-block">
-                            <div class="stat-row"><span class="stat-label">Kisakunto (5 kisaa)</span><span class="stat-value" style="color:var(--primary);">${kisakunto}</span></div>
-                            <div class="stat-row"><span class="stat-label">Keskiarvo (Valitut)</span><span class="stat-value">${kaValitut}</span></div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Viimeisen 5 kisan keskiarvo (paras ja heikoin tulos poistettu tasoittamaan poikkeamia)">Kisakunto (5 kisaa) <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value" style="color:var(--primary);">${kisakunto}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Kaikkien suodatuksella näkyvissä olevien kilpailujen aritmeettinen keskiarvo">Keskiarvo (Valitut) <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value">${kaValitut}</span>
+                            </div>
                         </div>
 
                         <!-- Ennätykset -->
                         <div class="stat-block">
-                            <div class="stat-row"><span class="stat-label">Ennätys (PB)</span><span class="stat-value" style="color:var(--gold);">${pb}</span></div>
-                            <div class="stat-row"><span class="stat-label">Valitun paras</span><span class="stat-value">${valitunAjanParas}</span></div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Ampujan kaikkien aikojen paras tulos kyseisessä lajissa">Ennätys (PB) <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value" style="color:var(--gold);">${pb}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Paras tulos valitulta ajanjaksolta tai kisa-rajoituksella">Valitun paras <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value">${valitunAjanParas}</span>
+                            </div>
                         </div>
 
                         <!-- Tasaisuus & Trendi -->
                         <div class="stat-block">
-                            <div class="stat-row"><span class="stat-label">Tasaisuus</span><span class="stat-value">${tasaisuus}</span></div>
-                            <div class="stat-row"><span class="stat-label">Hajonta / Trendi</span><span class="stat-value">±${hajonta} (${trendiTxt})</span></div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Suoritusvarmuus 0-100% laskettuna hajonnasta. Korkeampi lukema tarkoittaa tasaisempaa ammuntaa.">Tasaisuus <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value">${tasaisuus}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label tooltip-wrap" data-tooltip="Standardipoikkeama ±pisteinä sekä kaksi viimeisimmän kisan välinen tulosmuutos (+/-)">Hajonta / Trendi <span class="info-icon">ⓘ</span></span>
+                                <span class="stat-value">±${hajonta} (${trendiTxt})</span>
+                            </div>
                         </div>
                     </div>
                 </div>
